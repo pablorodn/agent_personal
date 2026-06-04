@@ -1,0 +1,33 @@
+---
+description: Politicas de seguridad (HITL, secretos, OAuth, flags de riesgo)
+alwaysApply: true
+---
+
+# Reglas de Seguridad
+
+- Toda tool de riesgo `medium` o `high` requiere confirmacion humana en modo interactivo.
+- `bypass_confirmation=True` solo se permite para ejecuciones `cron` autenticadas y no autoaprueba tools sensibles: solo ejecuta tools `low` o `cron_safe=true`.
+- Secretos (`SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `GITHUB_CLIENT_SECRET`, `OAUTH_ENCRYPTION_KEY`) nunca se exponen al cliente.
+- Tokens OAuth se guardan cifrados con AES-256-GCM; conservar formato compatible `iv:authTag:ciphertext`.
+- Feature flags son fail-closed: `BASH_TOOL_ENABLED` y `FILE_TOOLS_ENABLED` solo habilitan con valor exacto `"true"`.
+- Confinamiento de filesystem: las file tools resuelven todo path con `Path(p).resolve()` y rechazan con error explícito cualquier ruta fuera de `FILE_TOOLS_ROOT` (default `cwd`). `bash` se ejecuta siempre con `cwd=BASH_TOOL_CWD`, timeout duro y denylist mínima de comandos destructivos; nunca con input shell concatenado.
+- `POST /api/cron/scheduled-tasks` debe validar `Authorization: Bearer <CRON_SECRET>` en produccion.
+- La política de memoria de largo plazo del brief es obligatoria: no guardar secretos, credenciales ni datos sensibles sin consentimiento explícito.
+
+## Guardas obligatorias
+
+- Validar ownership de `session_id`, `tool_call_id` y recursos del usuario antes de ejecutar o reanudar.
+- Mantener validacion de `state` en OAuth GitHub y expirar cookie de estado en callback.
+- Registrar `tool_calls` con estados (`pending_confirmation`, `approved`, `rejected`, `executed`, `failed`) para auditoria.
+
+## Ejemplo (bueno vs malo)
+
+```python
+# ✅ Bueno
+if tool_requires_confirmation(tool_id):
+    decision = interrupt(payload)
+
+# ❌ Malo
+if user_said_ok_in_chat:
+    run_dangerous_tool()
+```

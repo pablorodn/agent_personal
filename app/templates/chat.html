@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Chat — {{ agent_name }}{% endblock %}
+{% block content %}
+<div class="flex h-screen flex-col">
+  {% include "partials/topbar.html" %}
+  <div class="flex flex-1 overflow-hidden">
+    <aside id="sidebar" class="{{ 'w-64' if sidebar_open else 'w-0' }} flex-shrink-0 overflow-hidden border-r border-neutral-200 transition-all dark:border-neutral-800">
+      <div class="flex h-full w-64 flex-col">
+        <div class="p-3">
+          <button hx-post="/api/sessions" hx-target="#session-list" hx-swap="afterbegin" class="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+            + Nueva sesión
+          </button>
+        </div>
+        <nav id="session-list" class="flex-1 space-y-1 overflow-y-auto px-2 pb-3">
+          {% for session in sessions %}
+            {% include "partials/session_item.html" %}
+          {% else %}
+          <p class="px-3 py-4 text-xs text-neutral-400">No hay sesiones. Crea una nueva.</p>
+          {% endfor %}
+        </nav>
+      </div>
+    </aside>
+    <div class="flex flex-1 flex-col overflow-hidden">
+      <div class="flex items-center border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
+        <span class="flex-1 truncate text-xs text-neutral-500">
+          {% if current_session_id %}Sesión activa{% else %}Sin sesión{% endif %}
+        </span>
+        {% if current_session_id %}
+        <button hx-post="/api/sessions/{{ current_session_id }}/clear" hx-target="#messages" hx-swap="innerHTML" class="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20">
+          Limpiar
+        </button>
+        {% endif %}
+      </div>
+      <div id="messages-container" class="flex-1 overflow-y-auto px-4 py-6">
+        <div id="messages" class="mx-auto max-w-2xl space-y-4">
+          {% include "partials/messages_list.html" %}
+        </div>
+      </div>
+      <div class="border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        {% if has_pending_confirmation %}
+        <p class="mx-auto mb-2 max-w-2xl text-center text-xs text-amber-600 dark:text-amber-400">
+          Aprueba o cancela la acción pendiente antes de continuar.
+        </p>
+        {% endif %}
+        <form id="chat-form" onsubmit="return submitChat(event, this)" class="mx-auto flex max-w-2xl gap-2">
+          <input type="hidden" name="session_id" value="{{ current_session_id }}" />
+          <input id="chat-input" name="message" type="text" placeholder="Escribe tu mensaje..." autocomplete="off" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />
+          <button type="submit" id="send-btn" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Enviar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  function escapeHtml(text) {
+    return text
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#39;");
+  }
+
+  function renderOutgoingMessage(form) {
+    if (form.dataset.isSubmitting === "true") return;
+    const input = document.getElementById("chat-input");
+    const messages = document.getElementById("messages");
+    const container = document.getElementById("messages-container");
+    if (!input || !messages || !container) return;
+    const text = (input.value || "").trim();
+    if (!text) return;
+    input.value = "";
+
+    const thinkingId = "thinking-" + Date.now().toString();
+    form.dataset.pendingThinkingId = thinkingId;
+    form.dataset.isSubmitting = "true";
+
+    const userHtml =
+      '<div class="flex justify-end">' +
+      '<div class="max-w-[80%] rounded-lg px-4 py-2.5 text-sm leading-relaxed bg-blue-600 text-white">' +
+      '<p class="whitespace-pre-wrap">' + escapeHtml(text) + "</p>" +
+      "</div></div>";
+
+    const thinkingHtml =
+      '<div id="' + thinkingId + '" class="flex justify-start">' +
+      '<div class="rounded-lg bg-neutral-100 px-4 py-2.5 text-sm dark:bg-neutral-800">' +
+      '<span class="animate-pulse" data-thinking-label>Pensando...</span>' +
+      "</div></div>";
+
+    messages.insertAdjacentHTML("beforeend", userHtml + thinkingHtml);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function finishOutgoingMessage(form) {
+    form.dataset.isSubmitting = "false";
+    const thinkingId = form.dataset.pendingThinkingId;
+    if (thinkingId) {
+      const thinkingNode = document.getElementById(thinkingId);
+      if (thinkingNode) thinkingNode.remove();
+      delete form.dataset.pendingThinkingId;
+    }
+    const input = document.getElementById("chat-input");
+    if (input) input.focus();
+    const container = document.getElementById("messages-container");
+    if (container) container.scrollTop = container.scrollHeight;
+  }
+
+  function guardChatSubmit(form) {
+    if (form.dataset.isSubmitting === "true") return false;
+    const input = document.getElementById("chat-input");
+    const sessionIdInput = form.querySelector('input[name="session_id"]');
+    if (!input || !sessionIdInput) return false;
+    if (!(sessionIdInput.value || "").trim()) return false;
+    if (!(input.value || "").trim()) return false;
+    return true;
+  }
+
+  function appendAssistantError(message) {
+    const messages = document.getElementById("messages");
+    const container = document.getElementById("messages-container");
+    if (!messages) return;
+    const safe = escapeHtml(message || "No pude generar la respuesta. Intenta de nuevo.");
+    const html =
+      '<div class="flex justify-start">' +
+      '<div class="max-w-[80%] rounded-lg bg-amber-100 px-4 py-2.5 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">' +
+      safe +
+      "</div></div>";
+    messages.insertAdjacentHTML("beforeend", html);
+    if (container) container.scrollTop = container.scrollHeight;
+  }
+
+  async function submitChat(event, form) {
+    event.preventDefault();
+    if (!guardChatSubmit(form)) return false;
+    renderOutgoingMessage(form);
+    const formData = new FormData(form);
+    const response = await fetch("/api/chat/stream", {
+      method: "POST",
+      body: formData,
+      headers: { Accept: "text/event-stream" },
+    });
+    if (!response.ok || !response.body) {
+      appendAssistantError("No pude generar la respuesta. Intenta de nuevo.");
+      finishOutgoingMessage(form);
+      return false;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+    const messages = document.getElementById("messages");
+    const container = document.getElementById("messages-container");
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
+      for (const block of parts) {
+        const lines = block.split("\n");
+        let eventName = "message";
+        let payload = "";
+        for (const line of lines) {
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          if (line.startsWith("data:")) payload += line.slice(5).trim();
+        }
+        if (!payload) continue;
+        let data = {};
+        try {
+          data = JSON.parse(payload);
+        } catch (_err) {
+          data = {};
+        }
+        if (eventName === "tick") {
+          const thinkingId = form.dataset.pendingThinkingId;
+          if (!thinkingId) continue;
+          const label = document.querySelector("#" + thinkingId + " [data-thinking-label]");
+          if (label && data.elapsed_ms) {
+            const sec = (Number(data.elapsed_ms) / 1000).toFixed(1);
+            label.textContent = "Pensando... " + sec + "s";
+          }
+          continue;
+        }
+        if (eventName === "error") {
+          appendAssistantError(data.message);
+          continue;
+        }
+        if (eventName === "message_html") {
+          if (messages && data.html) {
+            messages.insertAdjacentHTML("beforeend", data.html);
+            if (container) container.scrollTop = container.scrollHeight;
+          }
+        }
+      }
+    }
+
+    finishOutgoingMessage(form);
+    return false;
+  }
+</script>
+{% endblock %}

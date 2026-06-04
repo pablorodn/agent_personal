@@ -204,6 +204,7 @@ agent-personal-py/
 `POST /api/chat` y `POST /api/chat/confirm` llaman a `run_agent()`.
 `POST /api/telegram/webhook` llama a `run_agent()`.
 `POST /api/cron/scheduled-tasks` llama a `run_agent(bypass_confirmation=True)`.
+En modo cron NO se auto-aprueban todas las tools sensibles: solo se ejecutan sin confirmación las tools `low` o marcadas `cron_safe=True` en el catálogo; cualquier otra tool `medium`/`high` lanza error en ejecución desatendida.
 **El runtime del agente es siempre el mismo, independientemente del canal de origen.**
 
 ### Tabla completa de rutas
@@ -290,6 +291,19 @@ sin escribir JavaScript. El servidor devuelve fragmentos HTML parciales (partial
 
 Cuando el formulario se envía, HTMX hace el POST, el servidor devuelve un fragmento HTML
 con el nuevo mensaje, y HTMX lo inyecta al final del `<div id="messages">` sin recargar la página.
+
+### Navegación global — Topbar horizontal
+
+Todas las pantallas autenticadas (`/chat` y `/settings`) incluyen una **topbar horizontal**
+(`partials/topbar.html`) con el nombre del agente a la izquierda y la navegación a la derecha:
+links a **Chat**, **Ajustes** y botón **Salir**. Login, signup y onboarding NO la muestran.
+
+- Los links Chat/Ajustes son navegación de página completa (`<a href>`), no HTMX.
+- "Salir" hace `hx-post="/logout"`; el servidor responde `HX-Redirect: /login` y borra cookies.
+- Cada página autenticada pasa `agent_name` y `active_nav` (`"chat"` | `"settings"`) al contexto
+  para resaltar el link activo.
+
+El detalle visual completo del componente está en `docs/ui-design.md` (sección 3).
 
 ### Páginas y su implementación HTMX
 

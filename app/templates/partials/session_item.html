@@ -1,0 +1,12 @@
+<button hx-get="/chat/session/{{ session.id }}"
+        hx-target="#messages"
+        hx-swap="innerHTML"
+        class="w-full rounded-md px-3 py-2 text-left text-sm {% if session.id == current_session_id %}bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300{% else %}text-neutral-600 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-900{% endif %}">
+  <div class="truncate font-medium text-xs">
+    {% if session.last_used_at %}
+      {{ session.last_used_at | format_session_date }}
+    {% else %}
+      Nueva sesión
+    {% endif %}
+  </div>
+</button>

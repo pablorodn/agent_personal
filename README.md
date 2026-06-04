@@ -4,7 +4,9 @@ Repositorio en fase de brief para construir un agente personal conversacional co
 
 ## Estado actual
 
-Este repositorio contiene documentación, reglas de implementación y migraciones iniciales. La estructura de aplicación descrita en el brief es objetivo de implementación; no debe asumirse que `app/`, `pyproject.toml`, `.env.example` o `evals/` ya existen hasta que sean creados explícitamente.
+Este repositorio contiene la implementación del agente personal: estructura `app/` completa (routers, páginas, runtime LangGraph, tools, servicios, DB y templates), `pyproject.toml`, `.env.example`, `evals/`, suite de tests y las migraciones de Supabase.
+
+Pendientes de conexión conocidos (ver `docs/ui-design.md` §12): `app/pages/index.py`, `app/pages/chat.py` y `app/pages/settings.py` aún usan datos de marcador en algunos puntos y deben leer/escribir Supabase real; la topbar de navegación (`partials/topbar.html`) debe montarse en `chat.html` y `settings.html`.
 
 ## Orden recomendado de lectura
 
@@ -15,13 +17,15 @@ Este repositorio contiene documentación, reglas de implementación y migracione
 
 ## Fuentes de verdad
 
-| Tema | Fuente principal | Documentos asociados que deben mantenerse alineados |
-|---|---|---|
-| Arquitectura y runtime | `docs/technical-brief.md` | `.cursor/.rules/architecture.mdc`, `.cursor/.rules/guardrails.mdc` |
-| UI y HTMX | `docs/ui-design.md` | Tabla de rutas en `docs/technical-brief.md` |
-| Modelo de datos | `migrations/*.sql` | Sección 13 de `docs/technical-brief.md` |
+
+| Tema                              | Fuente principal          | Documentos asociados que deben mantenerse alineados                              |
+| --------------------------------- | ------------------------- | -------------------------------------------------------------------------------- |
+| Arquitectura y runtime            | `docs/technical-brief.md` | `.cursor/.rules/architecture.mdc`, `.cursor/.rules/guardrails.mdc`               |
+| UI y HTMX                         | `docs/ui-design.md`       | Tabla de rutas en `docs/technical-brief.md`                                      |
+| Modelo de datos                   | `migrations/*.sql`        | Sección 13 de `docs/technical-brief.md`                                          |
 | Seguridad, HITL y riesgo de tools | `docs/technical-brief.md` | `.cursor/.rules/security.mdc`, `.cursor/.rules/testing.mdc`, `docs/ui-design.md` |
-| Variables de entorno | `docs/technical-brief.md` | futuro `.env.example` |
+| Variables de entorno              | `docs/technical-brief.md` | futuro `.env.example`                                                            |
+
 
 ## Principios clave
 
@@ -31,9 +35,9 @@ Este repositorio contiene documentación, reglas de implementación y migracione
 - Frontend server-rendered con Jinja2 + HTMX; evitar introducir SPA en el MVP.
 - Cambios de esquema solo mediante migraciones incrementales.
 
-## Pendientes de implementación
+## Pendientes
 
-- Crear estructura `app/` descrita en el brief.
-- Crear `pyproject.toml` y `.env.example`.
-- Implementar routers, runtime LangGraph, tools, scheduler y templates.
-- Añadir suite de pruebas mínima conforme a `.cursor/.rules/testing.mdc`.
+- Conectar `app/pages/` a datos reales de Supabase (index, chat, settings) — ver `docs/ui-design.md` §12.
+- Montar `partials/topbar.html` en `chat.html` y `settings.html` con `agent_name` y `active_nav`.
+- Mantener verde la suite: `ruff check .`, `mypy app/`, `pytest`.
+
