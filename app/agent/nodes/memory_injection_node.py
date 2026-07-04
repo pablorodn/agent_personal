@@ -1,6 +1,71 @@
+import logging
+
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+
+from app.agent.embeddings import generate_embedding
 from app.agent.state import AgentState
+from app.db.queries.memories import increment_memory_retrieval_count, match_memories
+
+logger = logging.getLogger(__name__)
+
+MEMORY_MATCH_COUNT = 8
+MEMORY_HEADER = "[MEMORIA DEL USUARIO]"
 
 
-async def memory_injection_node(state: AgentState) -> dict:
-    # Hook point for long-term memory retrieval; initialized with no-op safe behavior.
-    return {"system_prompt": state["system_prompt"]}
+def _last_user_message_content(messages: list) -> str | None:
+    for message in reversed(messages):
+        if isinstance(message, HumanMessage):
+            content = message.content
+            if isinstance(content, str):
+                text = content.strip()
+                if text:
+                    return text
+    return None
+
+
+def _format_memory_block(memories: list[dict]) -> str:
+    lines = [MEMORY_HEADER]
+    for memory in memories:
+        content = (memory.get("content") or "").strip()
+        if content:
+            lines.append(f"- {content}")
+    return "\n".join(lines)
+
+
+async def memory_injection_node(state: AgentState, config: RunnableConfig) -> dict:
+    system_prompt = state["system_prompt"]
+    user_text = _last_user_message_content(state["messages"])
+    if not user_text:
+        return {"system_prompt": system_prompt}
+
+    configurable = config.get("configurable", {})
+    tool_ctx = configurable.get("tool_ctx", {})
+    db = tool_ctx.get("db")
+    user_id = state.get("user_id") or tool_ctx.get("user_id")
+    if not db or not user_id:
+        return {"system_prompt": system_prompt}
+
+    try:
+        query_embedding = await generate_embedding(user_text)
+        memories = await match_memories(db, user_id, query_embedding, limit=MEMORY_MATCH_COUNT)
+        if not memories:
+            return {"system_prompt": system_prompt}
+
+        memory_block = _format_memory_block(memories)
+        enriched_prompt = f"{memory_block}\n\n{system_prompt}"
+        memory_ids = [str(memory["id"]) for memory in memories if memory.get("id")]
+        if memory_ids:
+            await increment_memory_retrieval_count(db, memory_ids)
+        return {"system_prompt": enriched_prompt}
+    except Exception as exc:  # pragma: no cover - external services
+        logger.warning(
+            "Memory injection skipped due to recoverable error.",
+            extra={
+                "event": "memory_injection_error",
+                "reason": str(exc),
+                "user_id": user_id,
+                "session_id": state.get("session_id"),
+            },
+        )
+        return {"system_prompt": system_prompt}

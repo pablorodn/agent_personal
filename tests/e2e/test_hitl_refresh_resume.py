@@ -7,8 +7,8 @@ def test_parse_pending_confirmation_from_interrupt_payload():
             {
                 "tool_call_id": "db-tool-id",
                 "model_tool_call_id": "model-tool-id",
-                "tool_name": "github_create_issue",
-                "risk": "medium",
+                "tool_name": "write_file",
+                "risk": "high",
                 "message": "Confirma acción",
                 "args_preview": {"title": "Bug"},
                 "session_id": "session-1",

@@ -1,16 +1,17 @@
 ---
-description: Arquitectura base del agente personal (FastAPI + LangGraph + HTMX)
+description: Arquitectura base de agent_total (FastAPI + LangGraph + HTMX)
 alwaysApply: true
 ---
 
 # Reglas de Arquitectura
 
 - Mantener separacion por capas: `app/routers` (entrada HTTP), `app/agent` (runtime), `app/tools` (acciones), `app/db` (persistencia).
-- El runtime del agente se centraliza en `run_agent()`; no duplicar logica de negocio por canal (`web`, `telegram`, `cron`).
+- El runtime del agente se centraliza en `run_agent()`; no duplicar logica de negocio entre rutas web/API.
 - Respetar el grafo canonical: `memory_injection -> compaction -> agent -> tools`.
 - Tratar `tool catalog + risk policy` como source of truth; no hardcodear riesgos en prompts o routers.
 - En frontend usar SSR + HTMX (partials HTML). Evitar introducir frameworks SPA o endpoints JSON cuando el flujo sea de UI parcial.
 - Mantener compatibilidad con esquema Supabase actual; `migrations/*.sql` es la fuente de verdad del esquema y cambios de datos van por migraciones incrementales.
+- El alcance actual de `agent_total` prioriza web; los canales `telegram` y `cron` quedan fuera de este alcance de implementación, sin prohibir su posible regreso futuro.
 
 ## Fuentes de verdad
 

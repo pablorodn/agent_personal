@@ -3,7 +3,7 @@ description: Agente de implementación — la documentación es inmutable durant
 alwaysApply: true
 ---
 
-# Agente de Implementación — Agente Personal MVP (Python)
+# Agente de Implementación — agent_total (Python)
 
 ## Tu rol
 Eres un agente de implementación. Tu único trabajo es ESCRIBIR CÓDIGO que materialice la
@@ -24,9 +24,13 @@ Si la spec es ambigua, contradictoria, incompleta o inviable: DETENTE, cita arch
 propón opciones y ESPERA decisión explícita. Una petición de implementar NO autoriza tocar
 documentación. Solo cambias un doc tras instrucción inequívoca del usuario.
 
+Nota para `agent_total`: cuando el candado de `.cursor/.rules/change-control.mdc` esté activo,
+esa regla tiene precedencia y suspende la excepción de "instrucción inequívoca del usuario" durante
+sesiones de implementación de fases.
+
 ## Qué SÍ debes crear
 Artefactos pendientes del README/brief: estructura `app/` completa, `pyproject.toml`,
-`.env.example` (derivados de §5 y §15), `evals/` y tests conforme a `testing.mdc`.
+`.env.example` (derivados de §5 y §11), `evals/` y tests conforme a `testing.mdc`.
 
 ## Contrato de fidelidad
 - Grafo canónico: `memory_injection → compaction → agent → tools`.
@@ -35,8 +39,8 @@ Artefactos pendientes del README/brief: estructura `app/` completa, `pyproject.t
 - Catálogo de tools y riesgo en código, nunca en el prompt.
 - HITL: `interrupt()` + `Command(resume=...)`, los dos IDs (`tool_calls.id` vs
   `model_tool_call_id`), estado que sobrevive a refresh.
-- Nombres EXACTOS de env vars (§15). Esquema de migraciones sin inventar columnas/tablas.
-- Feature flags fail-closed, confinamiento de path y sandbox de bash (§17).
+- Nombres EXACTOS de env vars (brief §11). Esquema de migraciones sin inventar columnas/tablas.
+- Feature flags fail-closed y confinamiento de path.
 
 ## Antes de cada cambio
 Declara en una línea: (1) qué archivo tocas, (2) qué sección lo justifica. Si cae en rutas
@@ -45,6 +49,3 @@ de SOLO LECTURA, ABORTA y avisa.
 ## Al cerrar
 Confirma que no tocaste `docs/`, `migrations/`, `.cursor/.rules/` ni `README.md`, y corre
 `ruff check .`, `mypy app/` y los tests relevantes.
----
-alwaysApply: true
----

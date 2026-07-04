@@ -11,20 +11,22 @@ from langgraph.types import Command, interrupt
 from supabase import AsyncClient
 
 from app.agent.checkpointer import get_checkpointer
+from app.agent.langfuse import augment_invoke_config
 from app.agent.model import ainvoke_chat_with_fallback
 from app.agent.nodes.compaction_node import compaction_node
 from app.agent.nodes.memory_injection_node import memory_injection_node
 from app.agent.state import AgentState
-from app.db.queries.tool_calls import (
-    create_tool_call,
-    find_or_create_pending_tool_call,
-    update_tool_call_status,
-)
+from app.db.queries.tool_calls import find_or_create_pending_tool_call, update_tool_call_status
 from app.services.hitl import build_confirmation_message, sanitize_args
 from app.tools.adapters import TOOL_HANDLERS
-from app.tools.catalog import get_tool_risk, tool_is_cron_safe, tool_requires_confirmation
+from app.tools.catalog import get_tool_risk, tool_requires_confirmation
+from app.tools.with_tracking import run_with_tracking
 
 MAX_TOOL_ITERATIONS = 6
+MAX_TOOL_ITERATIONS_LIMIT_MESSAGE = (
+    "Alcancé el límite de 6 iteraciones de herramientas para este turno. "
+    "Respondo con lo obtenido hasta ahora; si necesitás más pasos, enviá otro mensaje."
+)
 
 
 @dataclass
@@ -34,10 +36,8 @@ class AgentInput:
     system_prompt: str
     db: AsyncClient
     enabled_tools: list[str]
-    integrations: list[str]
     message: str | None = None
     resume_decision: str | None = None
-    github_token: str | None = None
     bypass_confirmation: bool = False
 
 
@@ -96,8 +96,14 @@ async def agent_node(state: AgentState) -> dict[str, list[AIMessage]]:
 def should_continue(state: AgentState) -> str:
     last = state["messages"][-1]
     if isinstance(last, AIMessage) and last.tool_calls:
+        if state.get("tool_iteration_count", 0) >= MAX_TOOL_ITERATIONS:
+            return "limit_reached"
         return "tools"
     return "end"
+
+
+async def limit_reached_node(state: AgentState) -> dict[str, list[AIMessage]]:
+    return {"messages": [AIMessage(content=MAX_TOOL_ITERATIONS_LIMIT_MESSAGE)]}
 
 
 async def tool_executor_node(state: AgentState, config: RunnableConfig) -> dict[str, Any]:
@@ -123,20 +129,6 @@ async def tool_executor_node(state: AgentState, config: RunnableConfig) -> dict[
             )
             continue
         if tool_requires_confirmation(tool_id):
-            if state.get("bypass_confirmation") and tool_is_cron_safe(tool_id):
-                record = await create_tool_call(
-                    db=tool_ctx["db"],
-                    session_id=state["session_id"],
-                    tool_name=tool_id,
-                    args=args,
-                    needs_confirmation=True,
-                    model_tool_call_id=model_tc_id,
-                )
-                await update_tool_call_status(tool_ctx["db"], record.id, "approved")
-                result = await TOOL_HANDLERS[tool_id](args, tool_ctx)
-                await update_tool_call_status(tool_ctx["db"], record.id, "executed", result)
-                results.append(ToolMessage(content=json.dumps(result), tool_call_id=model_tc_id))
-                continue
             if state.get("bypass_confirmation"):
                 raise ValueError(f"Tool {tool_id} is not safe for unattended cron execution")
             record = await find_or_create_pending_tool_call(
@@ -165,9 +157,23 @@ async def tool_executor_node(state: AgentState, config: RunnableConfig) -> dict[
             await update_tool_call_status(tool_ctx["db"], record.id, "executed", result)
             results.append(ToolMessage(content=json.dumps(result), tool_call_id=model_tc_id))
             continue
-        result = await TOOL_HANDLERS[tool_id](args, tool_ctx)
+
+        async def _handler(tool_args: dict[str, Any], *, _tool_id: str = tool_id) -> dict[str, Any]:
+            return await TOOL_HANDLERS[_tool_id](tool_args, tool_ctx)
+
+        result = await run_with_tracking(
+            db=tool_ctx["db"],
+            session_id=state["session_id"],
+            tool_id=tool_id,
+            args=args,
+            handler=_handler,
+            model_tool_call_id=model_tc_id or None,
+        )
         results.append(ToolMessage(content=json.dumps(result), tool_call_id=model_tc_id))
-    return {"messages": results}
+    return {
+        "messages": results,
+        "tool_iteration_count": state.get("tool_iteration_count", 0) + 1,
+    }
 
 
 _app = None
@@ -182,10 +188,16 @@ async def _get_graph_app():
     graph.add_node("compaction", compaction_node)
     graph.add_node("agent", agent_node)
     graph.add_node("tools", tool_executor_node)
+    graph.add_node("limit_reached", limit_reached_node)
     graph.add_edge(START, "memory_injection")
     graph.add_edge("memory_injection", "compaction")
     graph.add_edge("compaction", "agent")
-    graph.add_conditional_edges("agent", should_continue, {"tools": "tools", "end": END})
+    graph.add_conditional_edges(
+        "agent",
+        should_continue,
+        {"tools": "tools", "end": END, "limit_reached": "limit_reached"},
+    )
+    graph.add_edge("limit_reached", END)
     graph.add_edge("tools", "compaction")
     checkpointer = await get_checkpointer()
     _app = graph.compile(checkpointer=checkpointer)
@@ -203,9 +215,13 @@ async def run_agent(agent_input: AgentInput) -> AgentOutput:
         "user_id": agent_input.user_id,
         "session_id": agent_input.session_id,
         "enabled_tools": agent_input.enabled_tools,
-        "github_token": agent_input.github_token,
     }
-    config = {"configurable": {"thread_id": agent_input.session_id, "tool_ctx": tool_ctx}}
+    config = augment_invoke_config(
+        {"configurable": {"thread_id": agent_input.session_id, "tool_ctx": tool_ctx}},
+        user_id=agent_input.user_id,
+        session_id=agent_input.session_id,
+        is_resume=bool(agent_input.resume_decision),
+    )
     if agent_input.resume_decision:
         final_state = await app.ainvoke(Command(resume=agent_input.resume_decision), config=config)
     else:
@@ -217,6 +233,8 @@ async def run_agent(agent_input: AgentInput) -> AgentOutput:
                 "user_id": agent_input.user_id,
                 "system_prompt": agent_input.system_prompt,
                 "compaction_count": 0,
+                "compaction_failure_count": 0,
+                "tool_iteration_count": 0,
                 "bypass_confirmation": agent_input.bypass_confirmation,
             },
             config=config,

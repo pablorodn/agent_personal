@@ -15,7 +15,7 @@ from app.pages import chat as chat_pages
 from app.pages import index as index_pages
 from app.pages import onboarding as onboarding_pages
 from app.pages import settings as settings_pages
-from app.routers import auth, chat, cron, integrations, sessions, telegram
+from app.routers import auth, chat, sessions
 from app.template_filters import register_template_filters
 
 templates = Jinja2Templates(directory="app/templates")
@@ -36,9 +36,6 @@ app.include_router(chat_pages.router)
 app.include_router(settings_pages.router)
 app.include_router(chat.router)
 app.include_router(sessions.router)
-app.include_router(integrations.router)
-app.include_router(telegram.router)
-app.include_router(cron.router)
 
 
 @app.on_event("startup")

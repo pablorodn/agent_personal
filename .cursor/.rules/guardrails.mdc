@@ -5,9 +5,9 @@ alwaysApply: true
 
 # Guardrails del Proyecto
 
-- No romper contratos del MVP: rutas, nombres de variables de entorno y estados de `tool_calls`.
+- No romper contratos de `agent_total`: rutas, nombres de variables de entorno y estados de `tool_calls`.
 - No introducir cambios destructivos de git o base de datos sin instruccion explicita del usuario.
-- No modificar migraciones existentes (`00001`..`00004`); agregar nuevas migraciones incrementales.
+- No modificar migraciones existentes (`00001`..`00005`); agregar nuevas migraciones incrementales.
 - No agregar nuevas tools sin: schema validado, riesgo declarado, guardas de integracion, tracking y pruebas.
 - No ejecutar acciones sensibles por inferencia de lenguaje natural; usar pipeline HITL y aprobacion explicita.
 - No degradar observabilidad: mantener trazas Langfuse (si esta configurado) y logging estructurado.
@@ -17,6 +17,7 @@ alwaysApply: true
 - Cambios pequenos y coherentes por capa; evitar mezclar UI, DB y runtime sin necesidad.
 - Preservar UX de HTMX: respuestas como partials, mensajes de error claros y estados deshabilitados al procesar.
 - Si una decision de arquitectura cambia el brief, documentar el delta en `docs/technical-brief.md`.
+- Mantener el runtime desacoplado de herramientas de dominio: extender por catálogo + handlers, no por condicionales en el grafo.
 
 ## Anti-patrones a evitar
 

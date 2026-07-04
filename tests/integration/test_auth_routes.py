@@ -74,14 +74,6 @@ def test_signup_happy_path_keeps_hx_redirect():
     assert "sb-access-token=" in response.headers.get("set-cookie", "")
     app.dependency_overrides.clear()
 
-
-def test_auth_callback_redirects_as_page_navigation():
-    client = TestClient(app)
-    response = client.get("/auth/callback", follow_redirects=False)
-    assert response.status_code == 303
-    assert response.headers["location"] == "/"
-
-
 def test_index_redirects_to_onboarding_when_incomplete(
     monkeypatch, patch_auth_middleware, auth_cookie
 ):

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
 from supabase_auth.errors import AuthApiError
@@ -102,7 +102,3 @@ async def logout():
     response.delete_cookie("sb-refresh-token")
     return response
 
-
-@router.get("/auth/callback")
-async def auth_callback():
-    return RedirectResponse(url="/", status_code=303)

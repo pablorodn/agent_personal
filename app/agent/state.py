@@ -10,4 +10,6 @@ class AgentState(TypedDict):
     user_id: str
     system_prompt: str
     compaction_count: int
+    compaction_failure_count: int
+    tool_iteration_count: int
     bypass_confirmation: bool

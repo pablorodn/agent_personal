@@ -19,24 +19,16 @@ def test_settings_get_loads_real_data(monkeypatch, patch_auth_middleware, auth_c
     async def _fake_enabled_tools(_db, _user_id):
         return ["read_file"]
 
-    async def _fake_get_integration(_db, _user_id, _provider):
-        return SimpleNamespace(status="active")
-
-    async def _fake_is_telegram_linked(_db, _user_id):
-        return True
-
     app.dependency_overrides[get_db] = _fake_db
     app.dependency_overrides[get_current_user_id] = _fake_user_id
     monkeypatch.setattr("app.pages.settings.get_profile", _fake_get_profile)
     monkeypatch.setattr("app.pages.settings.list_enabled_tool_ids", _fake_enabled_tools)
-    monkeypatch.setattr("app.pages.settings.get_integration", _fake_get_integration)
-    monkeypatch.setattr("app.pages.settings.is_telegram_linked", _fake_is_telegram_linked)
 
     client = TestClient(app)
     response = client.get("/settings", cookies=auth_cookie)
     assert response.status_code == 200
     assert "Atlas" in response.text
-    assert "Cuenta de Telegram vinculada." in response.text
+    assert "Herramientas" in response.text
     assert 'href="/settings"' in response.text
     assert "bg-blue-50 text-blue-700" in response.text
     app.dependency_overrides.clear()

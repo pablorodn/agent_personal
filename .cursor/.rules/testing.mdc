@@ -16,13 +16,13 @@ alwaysApply: true
 
 - `unit`: validacion de schemas, helpers, riesgo de tools y utilidades de seguridad.
 - `integration`: routers + DB (sesiones, mensajes, tool_calls, onboarding, settings).
-- `e2e`: chat web con tool low-risk, chat con HITL, y una ejecucion de tarea programada.
+- `e2e`: chat web con tool low-risk y chat con HITL.
 
 ## Ejemplo
 
 ```python
 def test_high_risk_tool_requires_confirmation():
-    assert tool_requires_confirmation("bash") is True
+    assert tool_requires_confirmation("edit_file") is True
 ```
 
 ## Matriz minima por feature
@@ -31,6 +31,4 @@ def test_high_risk_tool_requires_confirmation():
 - Chat: creación de sesión, envío de mensaje, historial y limpieza.
 - HITL: pending, approve, reject, failed y reanudación tras refresh.
 - Tools: política de riesgo, feature flags fail-closed, ownership checks.
-- Scheduler: autenticación con `CRON_SECRET`, claim de tareas, `cron_safe`, registro de runs.
 - Memoria: extracción, deduplicación, búsqueda vectorial, filtros de privacidad.
-- Integraciones: GitHub OAuth state/cifrado y Telegram link codes/webhook.

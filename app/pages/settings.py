@@ -3,9 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
 
-from app.db.queries.integrations import get_integration
 from app.db.queries.profiles import get_profile, upsert_profile
-from app.db.queries.telegram import is_telegram_linked
 from app.db.queries.tools import list_enabled_tool_ids, replace_enabled_tools
 from app.dependencies import get_current_user_id, get_db
 from app.tools.catalog import TOOL_CATALOG
@@ -22,8 +20,6 @@ async def settings_page(
 ):
     profile = await get_profile(db, user_id)
     enabled_tool_ids = await list_enabled_tool_ids(db, user_id)
-    github_integration = await get_integration(db, user_id, "github")
-    telegram_linked = await is_telegram_linked(db, user_id)
     profile_payload = {
         "name": profile.name if profile and profile.name else "",
         "agent_name": profile.agent_name if profile and profile.agent_name else "Agente",
@@ -43,11 +39,6 @@ async def settings_page(
             "profile": profile_payload,
             "tool_catalog": TOOL_CATALOG,
             "enabled_tool_ids": enabled_tool_ids,
-            "github_connected": bool(
-                github_integration and github_integration.status == "active"
-            ),
-            "telegram_linked": telegram_linked,
-            "link_code": None,
         },
     )
 

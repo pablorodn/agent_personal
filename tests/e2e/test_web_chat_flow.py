@@ -46,12 +46,6 @@ def test_topbar_visible_in_authenticated_pages(
     async def _fake_tools(_db, _user_id):
         return []
 
-    async def _fake_integration(_db, _user_id, _provider):
-        return None
-
-    async def _fake_telegram(_db, _user_id):
-        return False
-
     app.dependency_overrides[get_db] = _fake_db
     app.dependency_overrides[get_current_user_id] = _fake_user_id
     monkeypatch.setattr("app.pages.chat.get_or_create_active_session", _fake_session)
@@ -62,8 +56,6 @@ def test_topbar_visible_in_authenticated_pages(
     monkeypatch.setattr("app.pages.chat.has_pending_confirmation_for_session", _fake_pending)
     monkeypatch.setattr("app.pages.settings.get_profile", _fake_profile)
     monkeypatch.setattr("app.pages.settings.list_enabled_tool_ids", _fake_tools)
-    monkeypatch.setattr("app.pages.settings.get_integration", _fake_integration)
-    monkeypatch.setattr("app.pages.settings.is_telegram_linked", _fake_telegram)
 
     client = TestClient(app)
     chat_response = client.get("/chat", cookies=auth_cookie)

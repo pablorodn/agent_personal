@@ -26,14 +26,14 @@ def test_onboarding_step_tools_persists_in_session(
     response = client.post(
         "/onboarding/step/2",
         cookies=auth_cookie,
-        data={"enabled_tools": ["read_file", "schedule_task"]},
+        data={"enabled_tools": ["read_file", "write_file"]},
     )
     assert response.status_code == 200
 
     review = client.get("/onboarding/step/3", cookies=auth_cookie)
     assert review.status_code == 200
     assert "read_file" in review.text
-    assert "schedule_task" in review.text
+    assert "write_file" in review.text
     assert 'hx-target="body"' in review.text
     assert 'hx-swap="outerHTML"' in review.text
     app.dependency_overrides.clear()
@@ -80,13 +80,13 @@ def test_onboarding_finish_persists_profile_and_tools(
     client.post(
         "/onboarding/step/2",
         cookies=auth_cookie,
-        data={"enabled_tools": ["read_file", "bash"]},
+        data={"enabled_tools": ["read_file", "write_file"]},
     )
     response = client.post("/onboarding/finish", cookies=auth_cookie)
     assert response.status_code == 200
     assert response.headers["hx-redirect"] == "/chat"
     assert calls["profile"]["onboarding_completed"] is True
-    assert calls["tools"] == {"user_id": "user-1", "tool_ids": ["read_file", "bash"]}
+    assert calls["tools"] == {"user_id": "user-1", "tool_ids": ["read_file", "write_file"]}
     app.dependency_overrides.clear()
 
 

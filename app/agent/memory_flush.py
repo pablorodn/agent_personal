@@ -5,6 +5,7 @@ from supabase import AsyncClient
 from app.agent.embeddings import generate_embedding
 from app.db.queries.memories import save_memory
 from app.db.queries.messages import get_session_messages
+from app.services.memory_policy import can_store_memory
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ async def flush_session_memory(db: AsyncClient, user_id: str, session_id: str) -
             return
         latest = (messages[-1].content or "").strip()
         if not latest:
+            return
+        if not can_store_memory(latest):
             return
         embedding = await generate_embedding(latest)
         await save_memory(db, user_id=user_id, memory_type="episodic", content=latest, embedding=embedding)

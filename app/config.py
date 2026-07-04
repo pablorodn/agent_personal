@@ -16,35 +16,18 @@ class Settings(BaseSettings):
     openrouter_api_key: str = Field(alias="OPENROUTER_API_KEY")
     secret_key: str = Field(alias="SECRET_KEY")
 
-    github_client_id: str | None = Field(default=None, alias="GITHUB_CLIENT_ID")
-    github_client_secret: str | None = Field(default=None, alias="GITHUB_CLIENT_SECRET")
     oauth_encryption_key: str | None = Field(default=None, alias="OAUTH_ENCRYPTION_KEY")
 
-    telegram_bot_token: str | None = Field(default=None, alias="TELEGRAM_BOT_TOKEN")
-    telegram_webhook_secret: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_SECRET")
-    telegram_webhook_base_url: str | None = Field(default=None, alias="TELEGRAM_WEBHOOK_BASE_URL")
-
-    bash_tool_enabled: str | None = Field(default=None, alias="BASH_TOOL_ENABLED")
-    bash_tool_cwd: str | None = Field(default=None, alias="BASH_TOOL_CWD")
     file_tools_enabled: str | None = Field(default=None, alias="FILE_TOOLS_ENABLED")
     file_tools_root: str | None = Field(default=None, alias="FILE_TOOLS_ROOT")
-    cron_secret: str | None = Field(default=None, alias="CRON_SECRET")
 
     langfuse_public_key: str | None = Field(default=None, alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: str | None = Field(default=None, alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str = Field(default="https://cloud.langfuse.com", alias="LANGFUSE_HOST")
 
     @property
-    def is_bash_enabled(self) -> bool:
-        return self.bash_tool_enabled == "true"
-
-    @property
     def is_file_tools_enabled(self) -> bool:
         return self.file_tools_enabled == "true"
-
-    @property
-    def bash_cwd(self) -> Path:
-        return Path(self.bash_tool_cwd or Path.cwd()).resolve()
 
     @property
     def file_tools_allowed_root(self) -> Path:

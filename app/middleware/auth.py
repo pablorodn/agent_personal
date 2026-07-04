@@ -8,8 +8,8 @@ from starlette.responses import RedirectResponse, Response
 from app.db.client import create_server_client
 from app.dependencies import refresh_user_session, validate_access_token
 
-PUBLIC_PATHS = ("/login", "/signup", "/auth/callback", "/static", "/robots.txt", "/favicon.ico")
-SERVER_TO_SERVER_PATHS = ("/api/telegram/webhook", "/api/cron/")
+PUBLIC_PATHS: tuple[str, ...] = ("/login", "/signup", "/static", "/robots.txt", "/favicon.ico")
+SERVER_TO_SERVER_PATHS: tuple[str, ...] = ()
 logger = logging.getLogger(__name__)
 
 

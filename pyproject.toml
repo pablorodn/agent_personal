@@ -20,8 +20,6 @@ dependencies = [
   "langchain-core>=0.3",
   "langchain-openai>=0.2",
   "langgraph-checkpoint-postgres>=1.0",
-  "croniter>=2.0",
-  "python-telegram-bot>=21",
   "langfuse>=3.0",
   "opentelemetry-sdk>=1.25",
 ]

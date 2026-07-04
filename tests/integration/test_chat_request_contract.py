@@ -52,9 +52,6 @@ def test_chat_accepts_valid_payload_without_422(monkeypatch, patch_auth_middlewa
     async def _fake_tools(_db, _user_id):
         return ["read_file"]
 
-    async def _fake_integration(_db, _user_id, _provider):
-        return None
-
     async def _fake_run_agent(_input):
         from app.agent.graph import AgentOutput
 
@@ -66,7 +63,6 @@ def test_chat_accepts_valid_payload_without_422(monkeypatch, patch_auth_middlewa
     monkeypatch.setattr("app.routers.chat.add_message", _fake_add_message)
     monkeypatch.setattr("app.routers.chat.get_profile", _fake_profile)
     monkeypatch.setattr("app.routers.chat.list_enabled_tool_ids", _fake_tools)
-    monkeypatch.setattr("app.routers.chat.get_integration", _fake_integration)
     monkeypatch.setattr("app.routers.chat.run_agent", _fake_run_agent)
 
     client = TestClient(app)

@@ -13,6 +13,30 @@ def test_memory_policy_allows_regular_text():
 
 
 @pytest.mark.anyio
+async def test_flush_session_memory_blocks_sensitive_content(monkeypatch):
+    calls: dict[str, object] = {}
+
+    async def _fake_messages(_db, _session_id):
+        return [{"content": "my password is secret123"}]
+
+    async def _fake_embedding(_text):
+        calls["embedding"] = _text
+        return [0.1]
+
+    async def _fake_save_memory(_db, **kwargs):
+        calls["save"] = kwargs
+
+    monkeypatch.setattr("app.agent.memory_flush.get_session_messages", _fake_messages)
+    monkeypatch.setattr("app.agent.memory_flush.generate_embedding", _fake_embedding)
+    monkeypatch.setattr("app.agent.memory_flush.save_memory", _fake_save_memory)
+
+    await flush_session_memory(db=object(), user_id="user-1", session_id="session-1")
+
+    assert "embedding" not in calls
+    assert "save" not in calls
+
+
+@pytest.mark.anyio
 async def test_flush_session_memory_handles_external_errors(monkeypatch):
     async def _fake_messages(_db, _session_id):
         return [{"content": "hola"}]

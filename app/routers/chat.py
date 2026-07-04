@@ -10,8 +10,6 @@ from supabase import AsyncClient
 
 from app.agent.graph import AgentInput, run_agent
 from app.agent.memory_flush import flush_session_memory
-from app.db.crypto import decrypt
-from app.db.queries.integrations import get_integration
 from app.db.queries.messages import add_message
 from app.db.queries.profiles import get_profile
 from app.db.queries.sessions import get_session_by_id
@@ -82,15 +80,11 @@ async def chat(
     if session.user_id != user_id:
         raise HTTPException(status_code=403, detail="Session does not belong to user")
     await add_message(db, session_id, "user", clean_message)
-    profile, enabled_tools, github_integration = await asyncio.gather(
+    profile, enabled_tools = await asyncio.gather(
         get_profile(db, user_id),
         list_enabled_tool_ids(db, user_id),
-        get_integration(db, user_id, "github"),
     )
     db_ms = round((time.perf_counter() - db_start) * 1000, 2)
-    github_token: str | None = None
-    if github_integration and github_integration.encrypted_tokens:
-        github_token = decrypt(github_integration.encrypted_tokens)
     base_prompt = (
         profile.agent_system_prompt
         if profile and profile.agent_system_prompt
@@ -110,9 +104,7 @@ async def chat(
             system_prompt=system_prompt,
             db=db,
             enabled_tools=enabled_tools,
-            integrations=["github"] if github_integration and github_integration.status == "active" else [],
             message=clean_message,
-            github_token=github_token,
         )
     )
     agent_ms = round((time.perf_counter() - agent_start) * 1000, 2)
@@ -178,17 +170,13 @@ async def chat_stream(
         await add_message(db, session_id, "user", clean_message)
 
         db_start = time.perf_counter()
-        profile, enabled_tools, github_integration = await asyncio.gather(
+        profile, enabled_tools = await asyncio.gather(
             get_profile(db, user_id),
             list_enabled_tool_ids(db, user_id),
-            get_integration(db, user_id, "github"),
         )
         db_ms = round((time.perf_counter() - db_start) * 1000, 2)
         yield _sse("status", {"phase": "context_ready", "db_ms": db_ms})
 
-        github_token: str | None = None
-        if github_integration and github_integration.encrypted_tokens:
-            github_token = decrypt(github_integration.encrypted_tokens)
         base_prompt = (
             profile.agent_system_prompt
             if profile and profile.agent_system_prompt
@@ -210,9 +198,7 @@ async def chat_stream(
                     system_prompt=system_prompt,
                     db=db,
                     enabled_tools=enabled_tools,
-                    integrations=["github"] if github_integration and github_integration.status == "active" else [],
                     message=clean_message,
-                    github_token=github_token,
                 )
             )
         )
@@ -292,14 +278,10 @@ async def chat_confirm(
     session = await get_session_by_id(db, tool_call.session_id)
     if not session or session.user_id != user_id:
         raise HTTPException(status_code=403, detail="Tool call does not belong to user")
-    profile, enabled_tools, github_integration = await asyncio.gather(
+    profile, enabled_tools = await asyncio.gather(
         get_profile(db, user_id),
         list_enabled_tool_ids(db, user_id),
-        get_integration(db, user_id, "github"),
     )
-    github_token: str | None = None
-    if github_integration and github_integration.encrypted_tokens:
-        github_token = decrypt(github_integration.encrypted_tokens)
     base_prompt = (
         profile.agent_system_prompt
         if profile and profile.agent_system_prompt
@@ -318,9 +300,7 @@ async def chat_confirm(
             system_prompt=system_prompt,
             db=db,
             enabled_tools=enabled_tools,
-            integrations=["github"] if github_integration and github_integration.status == "active" else [],
             resume_decision=action,
-            github_token=github_token,
         )
     )
     msg = await add_message(db, tool_call.session_id, "assistant", result.response)

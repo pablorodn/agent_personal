@@ -24,27 +24,6 @@
         {% endfor %}
       </div>
     </section>
-    <section class="space-y-4">
-      <h2 class="text-base font-semibold">GitHub</h2>
-      <div id="github-section">
-        {% if github_connected %}
-          {% include "partials/github_connected_block.html" %}
-        {% else %}
-          {% include "partials/github_disconnected_block.html" %}
-        {% endif %}
-      </div>
-    </section>
-    <section class="space-y-4">
-      <h2 class="text-base font-semibold">Telegram</h2>
-      {% if telegram_linked %}
-      <p class="text-sm text-green-600">Cuenta de Telegram vinculada.</p>
-      {% else %}
-      <button hx-post="/api/telegram/generate-code" hx-target="#telegram-code-area" hx-swap="innerHTML" class="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900">
-        Generar código de vinculación
-      </button>
-      <div id="telegram-code-area"></div>
-      {% endif %}
-    </section>
     <div class="flex items-center gap-3">
       <button hx-post="/settings" hx-include="[name='name'], [name='agent_name'], [name='system_prompt'], [name='enabled_tools']" hx-target="#save-status" hx-swap="innerHTML" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
         Guardar cambios
