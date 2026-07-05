@@ -11,7 +11,7 @@ from app.config import get_settings
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 PRIMARY_CHAT_MODEL = "google/gemini-2.5-flash"
 FALLBACK_CHAT_MODEL = "openai/gpt-4o-mini"
-CHAT_TIMEOUT_SECONDS = 4.0
+CHAT_TIMEOUT_SECONDS = 20.0
 
 # Lista curada del selector de modelo (Fase 10). Única fuente de verdad hasta
 # futura sesión dedicada de documentación.
@@ -41,7 +41,7 @@ def create_chat_model(model_name: str = PRIMARY_CHAT_MODEL) -> ChatOpenAI:
     return ChatOpenAI(
         model=model_name,
         temperature=0.2,
-        max_tokens=220,
+        max_tokens=1000,
         timeout=CHAT_TIMEOUT_SECONDS,
         max_retries=0,
         openai_api_key=settings.openrouter_api_key,
