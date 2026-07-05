@@ -71,6 +71,7 @@ Tabla canónica en alcance para `agent_total`:
 | `GET /settings` | Página | HTML |
 | `POST /settings` | Página | Partial de estado guardado |
 | `POST /api/chat` | API | Partial de respuesta o panel HITL |
+| `POST /api/chat/stream` | API | `text/event-stream` (SSE): eventos `tick`, `message_html`, `error` |
 | `POST /api/chat/confirm` | API | Partial de respuesta final |
 | `GET /api/sessions` | API | JSON de sesiones |
 | `POST /api/sessions` | API | Partial de item de sesión |
@@ -78,11 +79,12 @@ Tabla canónica en alcance para `agent_total`:
 | `POST /api/sessions/{id}/archive` | API | `HX-Redirect: /chat` (si archiva la sesión actual) o partial vacío para remover item |
 | `POST /api/sessions/{id}/delete` | API | `HX-Redirect: /chat` (si elimina la sesión actual) o partial vacío para remover item |
 
+`POST /api/chat/stream` es la ruta que usa realmente la UI de `chat.html` (vía `fetch` + lectura de stream SSE, no HTMX) para enviar cada turno de chat, incluyendo texto y adjuntos multimodales. `POST /api/chat` es una ruta equivalente sin streaming (responde con el partial de mensaje ya completo), mantenida y con la misma cobertura funcional (incluye adjuntos y selector de modelo desde Fase 9/10) para no dejar el contrato documentado sin implementación, pero no es la que invoca el formulario de chat real.
+
 ### Capacidades objetivo nuevas en rutas
 
-- Adjuntos multimodales en chat desde `/chat` y `POST /api/chat`.
-- Selector de modelo en chat (`POST /api/chat`) persistiendo preferencia de usuario en `profiles.default_model`.
-- Documentar formalmente `POST /api/chat/stream` en fase de cierre/hardening.
+- Adjuntos multimodales en chat desde `/chat`, enviados por la UI vía `POST /api/chat/stream` (también soportado por `POST /api/chat`).
+- Selector de modelo en chat, resuelto y persistido en ambas rutas de envío (`POST /api/chat` y `POST /api/chat/stream`) en `profiles.default_model`.
 
 ### Sesiones: título automático, archivar y eliminar (plan Fase 13)
 
@@ -294,6 +296,7 @@ Para una tool proveniente de servidor MCP se sigue el mismo patrón: catálogo +
 | `LANGFUSE_SECRET_KEY` | Callback de trazas |
 | `LANGFUSE_HOST` | Host Langfuse |
 | `EVAL_USER_ID` | Usuario de `profiles` contra el cual correr `evals/run_faq_experiment.py` manualmente; no se usa en runtime de producción |
+| `ENVIRONMENT` | `development` (default) o `production`. Controla `secure`/`https_only` en cookies de sesión (`sb-access-token`, `sb-refresh-token`, cookie de `SessionMiddleware`): solo `production` activa `secure=True`. |
 
 ## 12) Estado operativo y próximos pasos
 

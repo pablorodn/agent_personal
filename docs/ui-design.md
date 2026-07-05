@@ -58,9 +58,11 @@ No se considera pendiente en esta etapa.
 
 ## 5) HTMX en chat (contrato)
 
+`chat.html` envía cada turno vía `fetch` a `POST /api/chat/stream` (`text/event-stream`, no HTMX), leyendo eventos `tick`/`message_html`/`error` e insertando el HTML recibido en `#messages` manualmente. `POST /api/chat` es una ruta equivalente sin streaming (misma cobertura de texto, adjuntos y selector de modelo), mantenida por contrato pero no invocada por la UI real. El resto de la tabla sí corresponde a interacciones HTMX reales:
+
 | Acción | Método + ruta | `hx-target` | `hx-swap` | Respuesta |
 | --- | --- | --- | --- | --- |
-| Enviar mensaje | `POST /api/chat` | `#messages` | `beforeend` | Partial de mensaje o confirmación |
+| Enviar mensaje (UI real, no HTMX) | `POST /api/chat/stream` vía `fetch` (SSE) | `#messages` (insertado manualmente) | — | Eventos `tick`/`message_html`/`error` |
 | Confirmar HITL | `POST /api/chat/confirm` | `#messages` | `beforeend` | Partial de mensaje final |
 | Crear sesión | `POST /api/sessions` | `#session-list` | `afterbegin` | Partial de sesión |
 | Cambiar sesión | `GET /chat/session/{id}` | `#messages` | `innerHTML` | Lista de mensajes |
@@ -74,7 +76,7 @@ Contrato objetivo de formulario:
 
 - `input type="file"` con `accept="image/png,image/jpeg,image/webp,application/pdf"`.
 - `enctype="multipart/form-data"` en `#chat-form`.
-- Envío de texto + archivos en una sola request `POST /api/chat`.
+- Envío de texto + archivos en una sola request. La UI real usa `POST /api/chat/stream`; `POST /api/chat` soporta el mismo contrato de adjuntos como ruta equivalente sin streaming.
 - Debe permitir pegar imagen desde portapapeles (`paste` sobre el input/área de chat) y adjuntarla sin pasar por selector de archivos.
 
 Validaciones UX mínimas:
@@ -163,7 +165,7 @@ Nuevos partials esperados en esta etapa:
 
 | Acción nueva | Método + ruta | `hx-target` | `hx-swap` | Resultado esperado |
 | --- | --- | --- | --- | --- |
-| Enviar chat con adjuntos | `POST /api/chat` | `#messages` | `beforeend` | Mensaje enviado con contenido multimodal |
+| Enviar chat con adjuntos (UI real, no HTMX) | `POST /api/chat/stream` vía `fetch` (SSE) | `#messages` (insertado manualmente) | — | Mensaje enviado con contenido multimodal |
 | Guardar modelo preferido | `POST /settings` (o endpoint dedicado) | `#save-status` | `innerHTML` | Confirmación de guardado |
 
 ## 12) Pendientes reales de esta etapa

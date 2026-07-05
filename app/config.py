@@ -27,6 +27,12 @@ class Settings(BaseSettings):
 
     mcp_example_server_url: str | None = Field(default=None, alias="MCP_EXAMPLE_SERVER_URL")
 
+    environment: str = Field(default="development", alias="ENVIRONMENT")
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment == "production"
+
     @property
     def is_file_tools_enabled(self) -> bool:
         return self.file_tools_enabled == "true"

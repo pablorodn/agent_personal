@@ -354,8 +354,8 @@
   async function submitChat(event, form) {
     event.preventDefault();
     if (!guardChatSubmit(form)) return false;
-    renderOutgoingMessage(form);
     const formData = new FormData(form);
+    renderOutgoingMessage(form);
     resetAttachmentsUI();
     const response = await fetch("/api/chat/stream", {
       method: "POST",

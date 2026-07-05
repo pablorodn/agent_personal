@@ -74,6 +74,54 @@ def test_signup_happy_path_keeps_hx_redirect():
     assert "sb-access-token=" in response.headers.get("set-cookie", "")
     app.dependency_overrides.clear()
 
+
+def _install_fake_login(app_, *, monkeypatch=None):
+    class _FakeSession:
+        access_token = "access-token"
+        refresh_token = "refresh-token"
+
+    class _FakeResult:
+        user = object()
+        session = _FakeSession()
+
+    class _FakeAuth:
+        async def sign_in_with_password(self, _payload):
+            return _FakeResult()
+
+    class _FakeDB:
+        auth = _FakeAuth()
+
+    async def _fake_db():
+        return _FakeDB()
+
+    app_.dependency_overrides[auth_router._db] = _fake_db
+
+
+def test_login_cookies_not_secure_by_default():
+    _install_fake_login(app)
+    client = TestClient(app)
+    response = client.post("/login", data={"email": "a@b.com", "password": "123456"})
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert set_cookie_headers
+    assert not any("secure" in header.lower() for header in set_cookie_headers)
+    app.dependency_overrides.clear()
+
+
+def test_login_cookies_secure_when_environment_is_production(monkeypatch):
+    _install_fake_login(app)
+
+    class _ProductionSettings:
+        is_production = True
+
+    monkeypatch.setattr("app.routers.auth.get_settings", lambda: _ProductionSettings())
+    client = TestClient(app)
+    response = client.post("/login", data={"email": "a@b.com", "password": "123456"})
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert set_cookie_headers
+    assert all("secure" in header.lower() for header in set_cookie_headers)
+    app.dependency_overrides.clear()
+
+
 def test_index_redirects_to_onboarding_when_incomplete(
     monkeypatch, patch_auth_middleware, auth_cookie
 ):

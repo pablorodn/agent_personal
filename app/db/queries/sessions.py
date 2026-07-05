@@ -11,6 +11,10 @@ class AgentSession(BaseModel):
     status: str
     last_used_at: str | None = None
     title: str | None = None
+    budget_tokens_used: int
+    budget_tokens_limit: int
+    created_at: str
+    updated_at: str
 
 
 async def list_sessions(db: AsyncClient, user_id: str, channel: str = "web") -> list[AgentSession]:

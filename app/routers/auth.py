@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
 from supabase_auth.errors import AuthApiError
 
+from app.config import get_settings
 from app.db.client import create_server_client
 
 router = APIRouter()
@@ -35,8 +36,9 @@ async def login(
     if result.user and result.session:
         response = HTMLResponse(status_code=200)
         response.headers["HX-Redirect"] = "/"
-        response.set_cookie("sb-access-token", result.session.access_token, httponly=True, secure=False)
-        response.set_cookie("sb-refresh-token", result.session.refresh_token, httponly=True, secure=False)
+        secure_cookies = get_settings().is_production
+        response.set_cookie("sb-access-token", result.session.access_token, httponly=True, secure=secure_cookies)
+        response.set_cookie("sb-refresh-token", result.session.refresh_token, httponly=True, secure=secure_cookies)
         return response
     return templates.TemplateResponse(
         request, "partials/login_form.html", {"request": request, "error": "Credenciales inválidas"}
@@ -78,8 +80,9 @@ async def signup(
         if session:
             response = HTMLResponse(status_code=200)
             response.headers["HX-Redirect"] = "/onboarding"
-            response.set_cookie("sb-access-token", session.access_token, httponly=True, secure=False)
-            response.set_cookie("sb-refresh-token", session.refresh_token, httponly=True, secure=False)
+            secure_cookies = get_settings().is_production
+            response.set_cookie("sb-access-token", session.access_token, httponly=True, secure=secure_cookies)
+            response.set_cookie("sb-refresh-token", session.refresh_token, httponly=True, secure=secure_cookies)
             return response
         return templates.TemplateResponse(
             request,
