@@ -1,3 +1,4 @@
+import asyncio
 import json
 from dataclasses import dataclass
 from datetime import datetime
@@ -202,30 +203,33 @@ def _build_initial_messages(
 
 
 _app = None
+_app_lock = asyncio.Lock()
 
 
 async def _get_graph_app():
     global _app
     if _app is not None:
         return _app
-    graph = StateGraph(AgentState)
-    graph.add_node("memory_injection", memory_injection_node)
-    graph.add_node("compaction", compaction_node)
-    graph.add_node("agent", agent_node)
-    graph.add_node("tools", tool_executor_node)
-    graph.add_node("limit_reached", limit_reached_node)
-    graph.add_edge(START, "memory_injection")
-    graph.add_edge("memory_injection", "compaction")
-    graph.add_edge("compaction", "agent")
-    graph.add_conditional_edges(
-        "agent",
-        should_continue,
-        {"tools": "tools", "end": END, "limit_reached": "limit_reached"},
-    )
-    graph.add_edge("limit_reached", END)
-    graph.add_edge("tools", "compaction")
-    checkpointer = await get_checkpointer()
-    _app = graph.compile(checkpointer=checkpointer)
+    async with _app_lock:
+        if _app is None:
+            graph = StateGraph(AgentState)
+            graph.add_node("memory_injection", memory_injection_node)
+            graph.add_node("compaction", compaction_node)
+            graph.add_node("agent", agent_node)
+            graph.add_node("tools", tool_executor_node)
+            graph.add_node("limit_reached", limit_reached_node)
+            graph.add_edge(START, "memory_injection")
+            graph.add_edge("memory_injection", "compaction")
+            graph.add_edge("compaction", "agent")
+            graph.add_conditional_edges(
+                "agent",
+                should_continue,
+                {"tools": "tools", "end": END, "limit_reached": "limit_reached"},
+            )
+            graph.add_edge("limit_reached", END)
+            graph.add_edge("tools", "compaction")
+            checkpointer = await get_checkpointer()
+            _app = graph.compile(checkpointer=checkpointer)
     return _app
 
 
