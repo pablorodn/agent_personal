@@ -224,17 +224,18 @@ Estado real actual:
 Alcance real de tipos de memoria:
 
 - La columna `type` de la tabla `memories` (`migrations/00004_long_term_memory.sql`) permite
-  3 valores: `episodic`, `semantic`, `procedural`. `episodic` y `semantic` tienen productor
-  real en el código: `flush_session_memory()` clasifica cada turno del usuario vía
-  `classify_memory_type()` (`app/agent/memory_classifier.py`), una llamada liviana al mismo
-  modelo de compactación (`create_compaction_model()`) usada para generar el título de
-  sesión (`app/agent/session_title.py`), con el mismo patrón de manejo de errores (fallback
-  a `episodic` ante cualquier fallo o respuesta ambigua). `memory_injection_node` agrupa las
-  memorias inyectadas en el prompt por tipo: las `semantic` bajo el header
-  `[HECHOS Y PREFERENCIAS DEL USUARIO]` y las `episodic` bajo `[MEMORIA DEL USUARIO]`, cada
-  sección omitida si queda vacía. `procedural` sigue siendo un valor válido del schema
-  reservado para extensión futura, sin implementación actual — mismo patrón que el punto de
-  extensión MCP (Fase 12): preparado en el schema, no construido.
+  3 valores: `episodic`, `semantic`, `procedural`. Los 3 tienen productor real en el código:
+  `flush_session_memory()` clasifica cada turno del usuario vía `classify_memory_type()`
+  (`app/agent/memory_classifier.py`), una llamada liviana al mismo modelo de compactación
+  (`create_compaction_model()`) usada para generar el título de sesión
+  (`app/agent/session_title.py`), con el mismo patrón de manejo de errores (fallback a
+  `episodic` ante cualquier fallo o respuesta ambigua — nunca a `procedural`).
+  `memory_injection_node` agrupa las memorias inyectadas en el prompt en 3 secciones, en este
+  orden (de lo más estable a lo más transitorio): `semantic` bajo el header
+  `[HECHOS Y PREFERENCIAS DEL USUARIO]`, `procedural` bajo
+  `[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]`, y `episodic` (incluyendo cualquier valor
+  de `type` desconocido o faltante) bajo `[MEMORIA DEL USUARIO]`; cada sección se omite si
+  queda vacía.
 
 ## 9) Langfuse y evaluaciones
 

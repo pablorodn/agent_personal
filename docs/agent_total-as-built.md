@@ -13,7 +13,10 @@ con UI SSR en Jinja2/HTMX, pensado como plantilla reutilizable más que como pro
 dominio específico. El runtime terminado incluye:
 
 - Memoria de largo plazo real: inyección efectiva de recuerdos relevantes en el prompt antes
-  de cada turno, con filtro de privacidad aplicado antes de persistir.
+  de cada turno, con filtro de privacidad aplicado antes de persistir. Cubre los 3 tipos del
+  schema (`episodic`, `semantic`, `procedural`), clasificados automáticamente vía
+  `classify_memory_type()` y agrupados en el prompt inyectado por tipo (ver
+  `docs/technical-brief.md` §8).
 - Compactación de contexto en dos etapas (resumen LLM estructurado por secciones + truncado
   duro de respaldo) con circuit breaker ante fallos consecutivos de la etapa LLM.
 - Mecanismo HITL genérico (`interrupt()` / `Command(resume=...)`) para tools de riesgo
@@ -51,13 +54,6 @@ dominio específico. El runtime terminado incluye:
   por slice que descarta mensajes antiguos; la idea de reemplazarlos por marcadores
   compactos en vez de descartarlos queda documentada como pendiente en
   `docs/technical-brief.md` §7, sin implementar.
-- Clasificación de memoria en `procedural`: el schema de `memories`
-  (`migrations/00004_long_term_memory.sql`) lo permite, sin productor real. `episodic` y
-  `semantic` sí están implementados: `flush_session_memory` clasifica cada turno vía
-  `classify_memory_type()` (`app/agent/memory_classifier.py`), una llamada liviana al modelo
-  de compactación siguiendo el mismo patrón que la generación de título de sesión
-  (`app/agent/session_title.py`); `memory_injection_node` agrupa el resultado en el prompt
-  inyectado por tipo, en secciones separadas (ver `docs/technical-brief.md` §8).
 
 ## Lección aprendida: el bug crítico de `chat.html`
 
