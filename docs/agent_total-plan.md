@@ -309,14 +309,17 @@ Criterio de aceptación (tests):
 
 ## Fase 14 - Cierre y hardening
 
-Estado: PENDIENTE
+Estado: HECHO
 
 Checklist:
 
-- [ ] Migrar `@app.on_event("startup")` a lifespan.
-- [ ] Limpiar los 3 `unused type: ignore` reportados por mypy.
-- [ ] `secure=True` condicional por entorno en cookies.
-- [ ] Documentar formalmente `POST /api/chat/stream` en brief y UI.
+- [x] Migrar `@app.on_event("startup")` a lifespan.
+- [x] Limpiar los 3 `unused type: ignore` reportados por mypy (investigado: ninguno de los 3 es realmente unused hoy — ver changelog).
+- [x] `secure=True` condicional por entorno en cookies.
+- [x] Documentar formalmente `POST /api/chat/stream` en brief y UI.
+- [x] Hallazgo Fase 9/11: bug de orden en `chat.html` (`renderOutgoingMessage` limpiaba `#chat-input` antes de construir `FormData`) — corregido.
+- [x] Hallazgo Fase 9/11: discrepancia `docs/ui-design.md` sobre `POST /api/chat` vs `POST /api/chat/stream` — corregida.
+- [x] Hallazgo Fase 13: columnas `budget_tokens_used`/`budget_tokens_limit`/`created_at`/`updated_at` ausentes del modelo `AgentSession` — agregadas al modelo.
 
 Criterio de aceptación (tests):
 
