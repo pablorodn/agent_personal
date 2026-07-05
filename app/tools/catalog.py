@@ -20,6 +20,7 @@ TOOL_CATALOG: list[ToolDefinition] = [
     ToolDefinition(id="read_file", name="read_file", description="Read file", risk="low", display_name="Leer archivo", display_description="Lee archivos UTF-8"),
     ToolDefinition(id="write_file", name="write_file", description="Create file", risk="high", display_name="Crear archivo", display_description="Crea archivo nuevo"),
     ToolDefinition(id="edit_file", name="edit_file", description="Edit file", risk="high", display_name="Editar archivo", display_description="Reemplaza una ocurrencia"),
+    ToolDefinition(id="mcp_example_ping", name="mcp_example_ping", description="Example MCP-sourced tool (stub)", risk="low", display_name="Ejemplo MCP (ping)", display_description="Tool de referencia del punto de extensión MCP; no se conecta a ningún servidor real"),
 ]
 
 

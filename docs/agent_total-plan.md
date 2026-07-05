@@ -263,13 +263,13 @@ Criterio de aceptación:
 
 ## Fase 12 - Punto de extensión MCP
 
-Estado: PENDIENTE
+Estado: EN PROGRESO (checklist implementado, no cerrada como HECHO — ver `docs/agent_total-changelog.md`)
 
 Checklist:
 
-- [ ] Crear scaffolding mínimo para tool de servidor MCP.
-- [ ] Demostrar registro vía catálogo + adapter sin tocar `graph.py`.
-- [ ] Documentar ejemplo de referencia.
+- [x] Crear scaffolding mínimo para tool de servidor MCP.
+- [x] Demostrar registro vía catálogo + adapter sin tocar `graph.py`.
+- [x] Documentar ejemplo de referencia.
 
 Criterio de aceptación (tests):
 

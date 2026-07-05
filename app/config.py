@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     langfuse_secret_key: str | None = Field(default=None, alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str = Field(default="https://cloud.langfuse.com", alias="LANGFUSE_HOST")
 
+    mcp_example_server_url: str | None = Field(default=None, alias="MCP_EXAMPLE_SERVER_URL")
+
     @property
     def is_file_tools_enabled(self) -> bool:
         return self.file_tools_enabled == "true"
