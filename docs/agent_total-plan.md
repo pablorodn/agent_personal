@@ -228,7 +228,7 @@ Criterio de aceptación (tests):
 
 ## Fase 10 - Selector de modelo
 
-Estado: EN PROGRESO (checklist implementado, no cerrada como HECHO — ver `docs/agent_total-changelog.md`)
+Estado: HECHO
 
 Checklist:
 
@@ -247,12 +247,12 @@ Criterio de aceptación (tests):
 
 ## Fase 11 - Pulido de UI
 
-Estado: PENDIENTE
+Estado: HECHO
 
 Checklist:
 
-- [ ] Botón copiar por mensaje del asistente.
-- [ ] Bloques de código con `highlight.js` vía CDN.
+- [x] Botón copiar por mensaje del asistente.
+- [x] Bloques de código con `highlight.js` vía CDN.
 
 Criterio de aceptación:
 

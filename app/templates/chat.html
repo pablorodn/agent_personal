@@ -255,6 +255,79 @@
     return true;
   }
 
+  const CODE_FENCE_RE = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)```/g;
+
+  function renderAssistantContentHtml(rawText) {
+    let html = "";
+    let lastIndex = 0;
+    let match;
+    CODE_FENCE_RE.lastIndex = 0;
+    while ((match = CODE_FENCE_RE.exec(rawText)) !== null) {
+      const [full, lang, code] = match;
+      const before = rawText.slice(lastIndex, match.index);
+      if (before) html += escapeHtml(before);
+      const langClass = lang ? " language-" + escapeHtml(lang) : "";
+      html +=
+        '<div class="code-block group/code relative my-2">' +
+        '<button type="button" data-copy-code title="Copiar código" ' +
+        'class="absolute right-1 top-1 rounded bg-neutral-700/80 px-1.5 py-0.5 text-xs text-neutral-100 opacity-0 transition-opacity hover:bg-neutral-600 group-hover/code:opacity-100">📋</button>' +
+        '<pre class="overflow-x-auto rounded-md p-3 text-xs"><code class="' +
+        langClass.trim() +
+        '">' +
+        escapeHtml(code) +
+        "</code></pre></div>";
+      lastIndex = match.index + full.length;
+    }
+    const rest = rawText.slice(lastIndex);
+    if (rest) html += escapeHtml(rest);
+    return html;
+  }
+
+  function enhanceAssistantMessage(el) {
+    if (!el || el.dataset.hlProcessed === "true") return;
+    const raw = el.dataset.rawContent;
+    if (raw === undefined) return;
+    el.innerHTML = renderAssistantContentHtml(raw);
+    el.querySelectorAll("pre code").forEach((block) => hljs.highlightElement(block));
+    el.dataset.hlProcessed = "true";
+  }
+
+  function enhanceAssistantMessages(root) {
+    (root || document).querySelectorAll("[data-assistant-content]").forEach(enhanceAssistantMessage);
+  }
+
+  async function copyTextWithFeedback(text, button) {
+    try {
+      await navigator.clipboard.writeText(text || "");
+    } catch (_err) {
+      return;
+    }
+    const original = button.textContent;
+    button.textContent = "Copiado ✓";
+    setTimeout(() => {
+      button.textContent = original;
+    }, 2000);
+  }
+
+  document.addEventListener("click", (event) => {
+    const copyMessageBtn = event.target.closest("[data-copy-message]");
+    if (copyMessageBtn) {
+      const bubble = copyMessageBtn.closest(".group");
+      const contentEl = bubble && bubble.querySelector("[data-assistant-content]");
+      copyTextWithFeedback(contentEl ? contentEl.dataset.rawContent : "", copyMessageBtn);
+      return;
+    }
+    const copyCodeBtn = event.target.closest("[data-copy-code]");
+    if (copyCodeBtn) {
+      const codeEl = copyCodeBtn.closest(".code-block").querySelector("code");
+      copyTextWithFeedback(codeEl ? codeEl.textContent : "", copyCodeBtn);
+    }
+  });
+
+  document.body.addEventListener("htmx:afterSwap", (event) => {
+    enhanceAssistantMessages(event.target);
+  });
+
   function appendAssistantError(message) {
     const messages = document.getElementById("messages");
     const container = document.getElementById("messages-container");
@@ -330,6 +403,7 @@
         if (eventName === "message_html") {
           if (messages && data.html) {
             messages.insertAdjacentHTML("beforeend", data.html);
+            enhanceAssistantMessages(messages);
             if (container) container.scrollTop = container.scrollHeight;
           }
         }
@@ -339,5 +413,7 @@
     finishOutgoingMessage(form);
     return false;
   }
+
+  enhanceAssistantMessages(document);
 </script>
 {% endblock %}
