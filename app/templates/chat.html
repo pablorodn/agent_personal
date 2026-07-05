@@ -7,56 +7,21 @@
     <aside id="sidebar" class="{{ 'w-64' if sidebar_open else 'w-0' }} flex-shrink-0 overflow-hidden border-r border-neutral-200 transition-all dark:border-neutral-800">
       <div class="flex h-full w-64 flex-col">
         <div class="p-3">
-          <button hx-post="/api/sessions" hx-target="#session-list" hx-swap="afterbegin" class="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+          <button hx-post="/api/sessions" hx-target="#messages" hx-swap="innerHTML" class="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
             + Nueva sesión
           </button>
         </div>
-        <nav id="session-list" class="flex-1 space-y-1 overflow-y-auto px-2 pb-3">
-          {% for session in sessions %}
-            {% include "partials/session_item.html" %}
-          {% else %}
-          <p class="px-3 py-4 text-xs text-neutral-400">No hay sesiones. Crea una nueva.</p>
-          {% endfor %}
-        </nav>
+        {% include "partials/session_list.html" %}
       </div>
     </aside>
     <div class="flex flex-1 flex-col overflow-hidden">
-      <div class="flex items-center border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
-        <span class="flex-1 truncate text-xs text-neutral-500">
-          {% if current_session_id %}Sesión activa{% else %}Sin sesión{% endif %}
-        </span>
-        {% if current_session_id %}
-        <button hx-post="/api/sessions/{{ current_session_id }}/clear" hx-target="#messages" hx-swap="innerHTML" class="rounded-md px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20">
-          Limpiar
-        </button>
-        {% endif %}
-      </div>
+      {% include "partials/session_status_bar.html" %}
       <div id="messages-container" class="flex-1 overflow-y-auto px-4 py-6">
         <div id="messages" class="mx-auto max-w-2xl space-y-4">
           {% include "partials/messages_list.html" %}
         </div>
       </div>
-      <div class="border-t border-neutral-200 px-4 py-3 dark:border-neutral-800">
-        {% if has_pending_confirmation %}
-        <p class="mx-auto mb-2 max-w-2xl text-center text-xs text-amber-600 dark:text-amber-400">
-          Aprueba o cancela la acción pendiente antes de continuar.
-        </p>
-        {% endif %}
-        <p id="attachment-error" class="mx-auto mb-2 hidden max-w-2xl text-center text-xs text-red-600 dark:text-red-400"></p>
-        <div id="attachment-preview" class="mx-auto mb-2 hidden max-w-2xl flex-wrap gap-1"></div>
-        <form id="chat-form" onsubmit="return submitChat(event, this)" enctype="multipart/form-data" class="mx-auto flex max-w-2xl gap-2">
-          <input type="hidden" name="session_id" value="{{ current_session_id }}" />
-          <input type="file" id="chat-attachments" name="attachments" multiple accept="image/png,image/jpeg,image/webp,application/pdf" class="hidden" onchange="handleAttachmentSelection(this)" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} />
-          <button type="button" onclick="document.getElementById('chat-attachments').click()" title="Adjuntar archivo" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800">📎</button>
-          <select name="chat_model" id="chat-model-select" title="Modelo" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="rounded-md border border-neutral-300 bg-white px-2 py-2 text-xs dark:border-neutral-700 dark:bg-neutral-900">
-            {% for model in curated_models %}
-            <option value="{{ model }}" {% if model == selected_model %}selected{% endif %}>{{ model }}</option>
-            {% endfor %}
-          </select>
-          <input id="chat-input" name="message" type="text" placeholder="Escribe tu mensaje..." autocomplete="off" onpaste="handleChatPaste(event)" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />
-          <button type="submit" id="send-btn" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Enviar</button>
-        </form>
-      </div>
+      {% include "partials/chat_composer.html" %}
     </div>
   </div>
 </div>
@@ -203,6 +168,9 @@
     if (!text && attachmentCount === 0) return;
     input.value = "";
 
+    const emptyState = document.getElementById("messages-empty-state");
+    if (emptyState) emptyState.remove();
+
     const thinkingId = "thinking-" + Date.now().toString();
     form.dataset.pendingThinkingId = thinkingId;
     form.dataset.isSubmitting = "true";
@@ -241,6 +209,28 @@
     if (input) input.focus();
     const container = document.getElementById("messages-container");
     if (container) container.scrollTop = container.scrollHeight;
+    refreshSessionSidebarItem(form);
+  }
+
+  function refreshSessionSidebarItem(form) {
+    const sessionIdInput = form.querySelector('input[name="session_id"]');
+    const sessionId = sessionIdInput && sessionIdInput.value;
+    if (!sessionId) return;
+    setTimeout(async () => {
+      try {
+        const response = await fetch("/api/sessions/" + sessionId + "/item");
+        if (!response.ok) return;
+        const html = await response.text();
+        const existing = document.getElementById("session-item-" + sessionId);
+        if (existing) {
+          existing.outerHTML = html;
+          const updated = document.getElementById("session-item-" + sessionId);
+          if (updated) htmx.process(updated);
+        }
+      } catch (_err) {
+        // Best-effort refresh; sidebar will catch up on next session switch or page load.
+      }
+    }, 1500);
   }
 
   function guardChatSubmit(form) {

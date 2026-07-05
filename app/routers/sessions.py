@@ -6,7 +6,9 @@ from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
 
 from app.agent.checkpointer import get_checkpointer
+from app.agent.model import CURATED_CHAT_MODELS, validate_model_selection
 from app.db.queries.messages import clear_session_messages
+from app.db.queries.profiles import get_profile
 from app.db.queries.sessions import (
     archive_session,
     create_session,
@@ -40,8 +42,40 @@ async def post_session(
     user_id: str = Depends(get_current_user_id),
 ):
     session = await create_session(db, user_id, channel="web")
+    sessions = await list_sessions(db, user_id=user_id, channel="web")
+    profile = await get_profile(db, user_id)
+    stored_default_model = getattr(profile, "default_model", None) if profile else None
+    selected_model = validate_model_selection(stored_default_model, user_id=user_id)
     return templates.TemplateResponse(
-        request, "partials/session_item.html", {"request": request, "session": session}
+        request,
+        "partials/chat_session_switch.html",
+        {
+            "request": request,
+            "messages": [],
+            "agent_name": profile.agent_name if profile and profile.agent_name else "Agente",
+            "sessions": sessions,
+            "current_session_id": session.id,
+            "has_pending_confirmation": False,
+            "curated_models": CURATED_CHAT_MODELS,
+            "selected_model": selected_model,
+        },
+    )
+
+
+@router.get("/{session_id}/item", response_class=HTMLResponse)
+async def get_session_item(
+    session_id: str,
+    request: Request,
+    db: AsyncClient = Depends(get_db),
+    user_id: str = Depends(get_current_user_id),
+):
+    session = await get_session_by_id(db, session_id)
+    if not session or session.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return templates.TemplateResponse(
+        request,
+        "partials/session_item.html",
+        {"request": request, "session": session, "current_session_id": session_id},
     )
 
 
@@ -89,7 +123,6 @@ async def archive_session_route(
         raise HTTPException(status_code=403, detail="Session does not belong to user")
     await archive_session(db, session_id)
     if session_id == current_session_id:
-        await create_session(db, user_id, channel="web")
         response = HTMLResponse(status_code=200)
         response.headers["HX-Redirect"] = "/chat"
         return response
@@ -111,7 +144,6 @@ async def delete_session_route(
     await _cleanup_checkpointer_thread(session_id)
     await delete_session(db, session_id)
     if session_id == current_session_id:
-        await create_session(db, user_id, channel="web")
         response = HTMLResponse(status_code=200)
         response.headers["HX-Redirect"] = "/chat"
         return response

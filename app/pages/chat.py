@@ -66,16 +66,28 @@ async def chat_session(
     session = await get_session_by_id(db, session_id)
     if not session or session.user_id != user_id:
         messages = []
+        current_session_id = None
+        has_pending_confirmation = False
     else:
         await touch_session(db, session_id)
         messages = await get_session_messages(db, session_id)
+        current_session_id = session_id
+        has_pending_confirmation = await has_pending_confirmation_for_session(db, session_id)
+    sessions = await list_sessions(db, user_id=user_id, channel="web")
     profile = await get_profile(db, user_id)
+    stored_default_model = getattr(profile, "default_model", None) if profile else None
+    selected_model = validate_model_selection(stored_default_model, user_id=user_id)
     return templates.TemplateResponse(
         request,
-        "partials/messages_list.html",
+        "partials/chat_session_switch.html",
         {
             "request": request,
             "messages": messages,
             "agent_name": profile.agent_name if profile and profile.agent_name else "Agente",
+            "sessions": sessions,
+            "current_session_id": current_session_id,
+            "has_pending_confirmation": has_pending_confirmation,
+            "curated_models": CURATED_CHAT_MODELS,
+            "selected_model": selected_model,
         },
     )

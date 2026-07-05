@@ -24,7 +24,7 @@ async def list_sessions(db: AsyncClient, user_id: str, channel: str = "web") -> 
         .eq("user_id", user_id)
         .eq("channel", channel)
         .eq("status", "active")
-        .order("last_used_at", desc=True)
+        .order("created_at", desc=True)
         .limit(10)
         .execute()
     )

@@ -1,4 +1,4 @@
-<div class="group relative" data-session-item>
+<div class="group relative" data-session-item id="session-item-{{ session.id }}">
   <button hx-get="/chat/session/{{ session.id }}"
           hx-target="#messages"
           hx-swap="innerHTML"
