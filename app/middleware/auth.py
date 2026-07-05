@@ -5,6 +5,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import RedirectResponse, Response
 
+from app.config import get_settings
 from app.db.client import create_server_client
 from app.dependencies import refresh_user_session, validate_access_token
 
@@ -66,25 +67,31 @@ class AuthMiddleware(BaseHTTPMiddleware):
                     )
                     return RedirectResponse(url="/login", status_code=307)
                 request.state.user_id = str(user.get("id") or "")
-            except Exception:
+            except Exception as exc:
                 logger.warning(
                     "Redirecting request due to auth provider error.",
-                    extra={"event": "auth_redirect", "request_id": request_id, "path": path, "reason": "auth_provider_error"},
+                    extra={
+                        "event": "auth_redirect",
+                        "request_id": request_id,
+                        "path": path,
+                        "reason": str(exc),
+                    },
                 )
                 return RedirectResponse(url="/login", status_code=307)
             response: Response = await call_next(request)
             if rotated_access_token and rotated_refresh_token:
+                secure_cookies = get_settings().is_production
                 response.set_cookie(
                     "sb-access-token",
                     rotated_access_token,
                     httponly=True,
-                    secure=False,
+                    secure=secure_cookies,
                 )
                 response.set_cookie(
                     "sb-refresh-token",
                     rotated_refresh_token,
                     httponly=True,
-                    secure=False,
+                    secure=secure_cookies,
                 )
             return response
         return await call_next(request)

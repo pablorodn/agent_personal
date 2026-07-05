@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from supabase_auth.errors import AuthApiError
 
+from app.config import get_settings
 from app.dependencies import get_current_user_id, get_db
 from app.main import app
 from app.routers import auth as auth_router
@@ -228,6 +229,123 @@ def test_auth_middleware_refreshes_expired_access_token_and_continues_request(mo
     assert "sb-access-token=new-access-token" in set_cookie
     assert "sb-refresh-token=new-refresh-token" in set_cookie
     app.dependency_overrides.clear()
+
+
+def _install_fake_refresh_middleware(monkeypatch):
+    class _FakeUser:
+        def model_dump(self):
+            return {"id": "user-1"}
+
+    class _RefreshSession:
+        access_token = "rotated-access-token"
+        refresh_token = "rotated-refresh-token"
+
+    class _RefreshResult:
+        user = _FakeUser()
+        session = _RefreshSession()
+
+    class _FakeAuth:
+        async def get_user(self, _token: str):
+            raise RuntimeError("JWT expired")
+
+        async def refresh_session(self, refresh_token: str):
+            assert refresh_token == "valid-refresh-token"
+            return _RefreshResult()
+
+    class _FakeClient:
+        auth = _FakeAuth()
+
+    async def _fake_create_server_client():
+        return _FakeClient()
+
+    async def _fake_db():
+        return object()
+
+    async def _fake_user_id():
+        return "user-1"
+
+    async def _fake_get_profile(_db, _user_id):
+        return SimpleNamespace(onboarding_completed=False)
+
+    monkeypatch.setattr("app.middleware.auth.create_server_client", _fake_create_server_client)
+    monkeypatch.setattr("app.pages.index.get_profile", _fake_get_profile)
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user_id] = _fake_user_id
+
+
+def _rotated_set_cookie_headers(response) -> list[str]:
+    return [
+        header
+        for header in response.headers.get_list("set-cookie")
+        if header.startswith("sb-access-token=") or header.startswith("sb-refresh-token=")
+    ]
+
+
+def test_auth_middleware_rotated_cookies_not_secure_by_default(monkeypatch):
+    _install_fake_refresh_middleware(monkeypatch)
+    client = TestClient(app)
+    response = client.get(
+        "/",
+        cookies={
+            "sb-access-token": "expired-access-token",
+            "sb-refresh-token": "valid-refresh-token",
+        },
+        follow_redirects=False,
+    )
+    rotated_headers = _rotated_set_cookie_headers(response)
+    assert rotated_headers
+    assert not any("secure" in header.lower() for header in rotated_headers)
+    app.dependency_overrides.clear()
+
+
+def test_auth_middleware_rotated_cookies_secure_when_environment_is_production(monkeypatch):
+    _install_fake_refresh_middleware(monkeypatch)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    get_settings.cache_clear()
+    try:
+        client = TestClient(app)
+        response = client.get(
+            "/",
+            cookies={
+                "sb-access-token": "expired-access-token",
+                "sb-refresh-token": "valid-refresh-token",
+            },
+            follow_redirects=False,
+        )
+        rotated_headers = _rotated_set_cookie_headers(response)
+        assert rotated_headers
+        assert all("secure" in header.lower() for header in rotated_headers)
+    finally:
+        get_settings.cache_clear()
+        app.dependency_overrides.clear()
+
+
+def test_auth_middleware_logs_real_exception_reason_for_unexpected_provider_error(
+    monkeypatch, caplog
+):
+    # create_server_client() falla antes de llegar al try/except interno de
+    # validate_access_token, así que la excepción solo puede ser atrapada por el
+    # except Exception genérico externo de AuthMiddleware.dispatch.
+    async def _fake_create_server_client():
+        raise RuntimeError("boom - unexpected supabase client failure")
+
+    monkeypatch.setattr("app.middleware.auth.create_server_client", _fake_create_server_client)
+
+    client = TestClient(app)
+    with caplog.at_level("WARNING", logger="app.middleware.auth"):
+        response = client.get(
+            "/",
+            cookies={"sb-access-token": "some-token"},
+            follow_redirects=False,
+        )
+    assert response.status_code == 307
+    assert response.headers["location"] == "/login"
+    warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert warning_records
+    assert any(
+        getattr(record, "reason", None) == "boom - unexpected supabase client failure"
+        for record in warning_records
+    )
 
 
 def test_auth_middleware_does_not_mask_downstream_errors_as_login_redirect(
