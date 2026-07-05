@@ -1,6 +1,11 @@
 <div class="flex {{ 'justify-end' if msg.role == 'user' else 'justify-start' }}">
   <div class="max-w-[80%] rounded-lg px-4 py-2.5 text-sm leading-relaxed {{ 'bg-blue-600 text-white' if msg.role == 'user' else 'bg-neutral-100 text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100' }}">
+    {% if msg.content %}
     <p class="whitespace-pre-wrap">{{ msg.content }}</p>
+    {% endif %}
+    {% if msg.structured_payload and msg.structured_payload["type"] == "attachment_note" %}
+      <p class="mt-1 text-xs opacity-80">📎 Se enviaron {{ msg.structured_payload["count"] }} archivo(s)</p>
+    {% endif %}
     {% if msg.structured_payload and msg.structured_payload["type"] == "pending_confirmation" and msg.structured_payload["confirmation_status"] == "pending" %}
       {% include "partials/confirmation.html" %}
     {% endif %}

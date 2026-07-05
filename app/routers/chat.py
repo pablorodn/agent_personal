@@ -2,8 +2,9 @@ import asyncio
 import json
 import logging
 import time
+from typing import Any
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
@@ -16,6 +17,11 @@ from app.db.queries.sessions import get_session_by_id
 from app.db.queries.tool_calls import get_pending_tool_call
 from app.db.queries.tools import list_enabled_tool_ids
 from app.dependencies import get_current_user_id, get_db
+from app.services.attachments import (
+    AttachmentValidationError,
+    build_attachment_blocks,
+    real_attachments,
+)
 
 router = APIRouter(prefix="/api")
 templates = Jinja2Templates(directory="app/templates")
@@ -29,6 +35,21 @@ LATENCY_STYLE_SUFFIX = (
 
 def _sse(event: str, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=True)}\n\n"
+
+
+def _error_fragment(message: str) -> str:
+    return (
+        '<div class="flex justify-start">'
+        '<div class="max-w-[80%] rounded-lg bg-amber-100 px-4 py-2.5 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">'
+        f"{message}"
+        "</div></div>"
+    )
+
+
+def _attachment_note_payload(count: int, kinds: list[str]) -> dict[str, Any] | None:
+    if not kinds:
+        return None
+    return {"type": "attachment_note", "count": count, "kinds": kinds}
 
 
 def _build_user_system_prompt(
@@ -57,19 +78,18 @@ async def chat(
     request: Request,
     message: str = Form(""),
     session_id: str = Form(""),
+    attachments: list[UploadFile] = File(default=[]),
     db: AsyncClient = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     total_start = time.perf_counter()
     db_start = time.perf_counter()
     clean_message = message.strip()
-    if not session_id.strip() or not clean_message:
+    files = real_attachments(attachments)
+    if not session_id.strip() or (not clean_message and not files):
         return Response(
-            content=(
-                '<div class="flex justify-start">'
-                '<div class="max-w-[80%] rounded-lg bg-amber-100 px-4 py-2.5 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">'
+            content=_error_fragment(
                 "No pude procesar el mensaje. Verifica la sesion activa e intenta de nuevo."
-                "</div></div>"
             ),
             media_type="text/html",
             status_code=400,
@@ -79,7 +99,17 @@ async def chat(
         raise HTTPException(status_code=404, detail="Session not found")
     if session.user_id != user_id:
         raise HTTPException(status_code=403, detail="Session does not belong to user")
-    await add_message(db, session_id, "user", clean_message)
+    try:
+        attachment_blocks, kinds = await build_attachment_blocks(files)
+    except AttachmentValidationError as exc:
+        return Response(content=_error_fragment(str(exc)), media_type="text/html", status_code=400)
+    await add_message(
+        db,
+        session_id,
+        "user",
+        clean_message,
+        structured_payload=_attachment_note_payload(len(files), kinds),
+    )
     profile, enabled_tools = await asyncio.gather(
         get_profile(db, user_id),
         list_enabled_tool_ids(db, user_id),
@@ -105,6 +135,7 @@ async def chat(
             db=db,
             enabled_tools=enabled_tools,
             message=clean_message,
+            attachment_blocks=attachment_blocks or None,
         )
     )
     agent_ms = round((time.perf_counter() - agent_start) * 1000, 2)
@@ -148,13 +179,15 @@ async def chat_stream(
     request: Request,
     message: str = Form(""),
     session_id: str = Form(""),
+    attachments: list[UploadFile] = File(default=[]),
     db: AsyncClient = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     async def _stream():
         total_start = time.perf_counter()
         clean_message = message.strip()
-        if not session_id.strip() or not clean_message:
+        files = real_attachments(attachments)
+        if not session_id.strip() or (not clean_message and not files):
             yield _sse(
                 "error",
                 {"message": "No pude procesar el mensaje. Verifica la sesion activa e intenta de nuevo."},
@@ -167,7 +200,18 @@ async def chat_stream(
         if session.user_id != user_id:
             yield _sse("error", {"message": "Sesion invalida para este usuario."})
             return
-        await add_message(db, session_id, "user", clean_message)
+        try:
+            attachment_blocks, kinds = await build_attachment_blocks(files)
+        except AttachmentValidationError as exc:
+            yield _sse("error", {"message": str(exc)})
+            return
+        await add_message(
+            db,
+            session_id,
+            "user",
+            clean_message,
+            structured_payload=_attachment_note_payload(len(files), kinds),
+        )
 
         db_start = time.perf_counter()
         profile, enabled_tools = await asyncio.gather(
@@ -199,6 +243,7 @@ async def chat_stream(
                     db=db,
                     enabled_tools=enabled_tools,
                     message=clean_message,
+                    attachment_blocks=attachment_blocks or None,
                 )
             )
         )

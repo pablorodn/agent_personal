@@ -178,3 +178,38 @@ el formato de bugs/tests de arriba.)
 - Motivo que activó la sesión: `EVAL_USER_ID` agregada a `.env.example` durante Fase 8 pero ausente en `docs/technical-brief.md` §11; aclaración del usuario antes de cerrar la fase.
 - Autorización: explícita en el prompt del usuario (verificar necesidad de `EVAL_USER_ID` y completar §11; no marcar Fase 8 como HECHO).
 - Archivo/sección cambiados: `docs/technical-brief.md` §11 (Variables de entorno) — añadida fila `EVAL_USER_ID` en opcionales con propósito de eval manual.
+
+## Fase 9 - Adjuntos multimodales (intento, sin cerrar como HECHO)
+
+- Fecha: 2026-07-05.
+- Valores no fijados por el checklist, confirmados explícitamente por el usuario antes de implementar (coinciden con los ya escritos en `docs/ui-design.md` §6, verificados durante la implementación):
+  - Límites: imagen ≤5 MB (`image/png`, `image/jpeg`, `image/webp`); PDF ≤10 MB (`application/pdf`); máximo 3 adjuntos por mensaje.
+  - Aviso de PDF ignorado por el modelo en modo best-effort: completamente silencioso (sin indicio adicional más allá del indicador genérico de adjuntos).
+  - `structured_payload.kinds`: lista de tipos únicos presentes (ej. `["image","pdf"]`), sin campos adicionales fuera de `type`/`count`/`kinds`.
+  - Texto del indicador: literal `📎 Se enviaron N archivo(s)` para cualquier N, sin variación singular/plural.
+  - Mensaje de texto vacío con adjuntos: se permite enviar el turno solo con adjuntos (se relajó la validación existente que exigía texto siempre).
+- Bugs encontrados/corregidos (dentro del alcance de esta fase):
+  - Ninguno preexistente en el código tocado; los únicos ajustes fueron los de tipado detectados por `mypy` durante la propia implementación (invariancia de `list[dict]` al usar `create_image_block`/`create_file_block` de `langchain_core` y al construir `HumanMessage(content=parts)`), resueltos con `dict(...)` y anotación `list[str | dict[Any, Any]]` respectivamente.
+- Discrepancias de spec: sin discrepancias de spec (los 5 valores no fijados por el checklist fueron confirmados con el usuario antes de escribir código; no requirieron modificar documentación congelada).
+- Hallazgos fuera de alcance de esta fase (no corregidos, solo reportados por instrucción explícita de no tocar código fuera del alcance autorizado):
+  - `app/templates/chat.html`: en `submitChat()`, `renderOutgoingMessage(form)` limpia `#chat-input` (`input.value = ""`) *antes* de que `new FormData(form)` se construya en la línea siguiente. Esto es previo a esta fase y no relacionado con adjuntos; con el diseño actual de adjuntos se evitó reproducir el mismo problema (el reset de adjuntos ocurre recién después de construir `FormData`, vía `resetAttachmentsUI()` tras la línea `const formData = new FormData(form)`).
+  - El contenido base64 de los adjuntos queda embebido en el `HumanMessage` que LangGraph persiste vía `AsyncPostgresSaver` (checkpointer), igual que el resto de la conversación. El checklist de esta fase dice "sin persistencia de adjuntos" pero eso se interpretó — y así lo confirmó el flujo de preguntas — como alcance de `agent_messages.structured_payload` (sin contenido binario en esa tabla), no como ausencia total de bytes en Postgres vía el checkpointer, que ya persiste el resto del historial de mensajes de todas las fases previas.
+  - `app/agent/nodes/memory_injection_node.py` (Fase 4, no tocado): `_last_user_message_content()` exige `isinstance(content, str)`; cuando un turno es solo-adjuntos (contenido tipo lista), la inyección de memoria se omite para ese turno (comportamiento fail-open ya existente, no una falla nueva).
+  - `docs/ui-design.md` §5/§11 documenta `POST /api/chat` como ruta de envío de chat con adjuntos, pero la UI real (`chat.html`) envía por `POST /api/chat/stream` (discrepancia preexistente, ya señalada para Fase 14). Se implementó soporte de adjuntos en ambos endpoints (`/api/chat` y `/api/chat/stream`) para no dejar el contrato documentado sin cobertura, sin cambiar cuál usa la UI.
+  - Partial `partials/chat_attachment_errors.html` sugerido como "o equivalente" en `docs/ui-design.md` §10: se implementó como `<p id="attachment-error">` gestionado por JS inline en `chat.html`, no como partial Jinja separado.
+- Verificación manual de UI: no se ejecutó en navegador real (evitado para no generar mensajes reales contra el Supabase/OpenRouter de producción configurados en `.env`). Se verificó en su lugar: sintaxis del bloque `<script>` de `chat.html` con `node --check` (OK), y el renderizado Jinja real de `chat.html`/`message.html` a través de los tests existentes que hacen `GET /chat` (pasan sin error de plantilla).
+- Resultado de validaciones:
+  - Baseline de fase (previo a cambios de código): `ruff check .` OK, `mypy app/` OK (51 archivos), `pytest -q` OK (`62 passed`).
+  - Final de fase: `ruff check .` OK, `mypy app/` OK (52 archivos), `pytest -q` OK (`79 passed`).
+  - Tests de aceptación: `tests/unit/test_attachments.py` (validación de tipo/tamaño/cantidad y construcción de content blocks), `tests/unit/test_agent_multimodal.py` (armado de `HumanMessage` multimodal, incluido `test_run_agent_passes_multimodal_content_to_graph`), `tests/integration/test_chat_attachments.py` (adjunto simulado end-to-end vía `POST /api/chat`, mensaje solo-adjuntos, rechazo por tamaño/tipo/cantidad sin persistir mensaje).
+- Fase NO marcada como HECHO por instrucción explícita del usuario; queda en estado `EN PROGRESO` en `docs/agent_total-plan.md` con el checklist tildado.
+
+## Sesión dedicada de documentación - adjuntos §10.1/§6 (texto opcional con adjuntos)
+
+- Fecha: 2026-07-05.
+- Motivo que activó la sesión: durante la Fase 9 se tomó una decisión de spec no registrada en la documentación congelada — se relajó la validación existente que exigía mensaje de texto siempre, para permitir enviar un turno solo con adjuntos y sin texto acompañante; el valor fue confirmado explícitamente por el usuario antes de implementar, pero no había quedado reflejado en `docs/technical-brief.md` ni en `docs/ui-design.md`.
+- Autorización: explícita en el prompt del usuario ("Parte A — Sesión de documentación dedicada (autorización explícita del usuario)"; no marcar Fase 9 como HECHO en ese paso).
+- Archivo/sección cambiados:
+  - `docs/technical-brief.md` §10.1 (Adjuntos multimodales en chat) — añadida línea "El mensaje de texto es opcional cuando el turno incluye adjuntos: se permite enviar solo adjuntos sin texto acompañante." junto a los límites existentes.
+  - `docs/ui-design.md` sección 6 (Adjuntos multimodales) — añadida la misma línea junto a "Límites de la etapa".
+- Cierre de Fase 9 (Parte B, 2026-07-05): con la documentación ya sincronizada, se re-ejecutó `ruff check .` (OK), `mypy app/` (OK, 52 archivos) y `pytest -q` (OK, `79 passed`) — mismo resultado que el "Final de fase" ya reportado, sin regresiones. Fase 9 cierra sin discrepancias de spec pendientes; `docs/agent_total-plan.md` pasa de `EN PROGRESO` a `HECHO`.

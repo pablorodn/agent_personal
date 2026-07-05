@@ -235,6 +235,7 @@ Estado real actual:
 - Cuando hay adjuntos, guardar metadata en `agent_messages.structured_payload` del mensaje de usuario (ej. `{"type":"attachment_note","count":N,"kinds":[...]}`) sin persistir contenido de archivo.
 - La UI renderiza indicador genérico de adjuntos (ej. `📎 Se enviaron N archivo(s)`) incluso tras recargar sesión.
 - Sin persistencia de adjuntos en esta etapa.
+- El mensaje de texto es opcional cuando el turno incluye adjuntos: se permite enviar solo adjuntos sin texto acompañante.
 
 Límites iniciales propuestos:
 

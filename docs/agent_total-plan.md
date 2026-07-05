@@ -206,18 +206,18 @@ Criterio de aceptación (tests):
 
 ## Fase 9 - Adjuntos multimodales
 
-Estado: PENDIENTE
+Estado: HECHO
 
 Checklist:
 
-- [ ] Input de archivo en formulario de chat.
-- [ ] Envío backend y construcción `HumanMessage` multimodal.
-- [ ] Soporte para imágenes y PDF.
-- [ ] Soporte multimodal acotado: imágenes garantizadas para ambos modelos de la lista curada; PDF en modo best-effort (si el modelo lo ignora, el turno continúa sin bloquear).
-- [ ] Límites de tamaño/tipo con errores claros en UI.
-- [ ] Persistir metadata de adjuntos en `agent_messages.structured_payload` del mensaje de usuario (ej. `{type: "attachment_note", count: N, kinds: [...]}`) sin guardar contenido binario.
-- [ ] Renderizar en historial indicador genérico de adjuntos (ej. `📎 Se enviaron N archivo(s)`), incluyendo recarga de sesión.
-- [ ] Permitir pegar imagen desde portapapeles (evento `paste` en input del chat) con los mismos límites de tipo/tamaño que el selector de archivos.
+- [x] Input de archivo en formulario de chat.
+- [x] Envío backend y construcción `HumanMessage` multimodal.
+- [x] Soporte para imágenes y PDF.
+- [x] Soporte multimodal acotado: imágenes garantizadas para ambos modelos de la lista curada; PDF en modo best-effort (si el modelo lo ignora, el turno continúa sin bloquear).
+- [x] Límites de tamaño/tipo con errores claros en UI.
+- [x] Persistir metadata de adjuntos en `agent_messages.structured_payload` del mensaje de usuario (ej. `{type: "attachment_note", count: N, kinds: [...]}`) sin guardar contenido binario.
+- [x] Renderizar en historial indicador genérico de adjuntos (ej. `📎 Se enviaron N archivo(s)`), incluyendo recarga de sesión.
+- [x] Permitir pegar imagen desde portapapeles (evento `paste` en input del chat) con los mismos límites de tipo/tamaño que el selector de archivos.
 
 Criterio de aceptación (tests):
 

@@ -89,6 +89,7 @@ Límites de la etapa:
 - PDF: hasta 10 MB.
 - Máximo 3 adjuntos por mensaje.
 - Sin persistencia de archivos en servidor o base de datos.
+- El mensaje de texto es opcional cuando el turno incluye adjuntos: se permite enviar solo adjuntos sin texto acompañante.
 
 Alcance real de soporte multimodal:
 

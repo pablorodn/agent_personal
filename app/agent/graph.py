@@ -39,6 +39,7 @@ class AgentInput:
     message: str | None = None
     resume_decision: str | None = None
     bypass_confirmation: bool = False
+    attachment_blocks: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -176,6 +177,20 @@ async def tool_executor_node(state: AgentState, config: RunnableConfig) -> dict[
     }
 
 
+def _build_initial_messages(
+    message: str | None, attachment_blocks: list[dict[str, Any]] | None
+) -> list[HumanMessage]:
+    if not message and not attachment_blocks:
+        return []
+    if not attachment_blocks:
+        return [HumanMessage(content=message)]
+    parts: list[str | dict[Any, Any]] = []
+    if message:
+        parts.append({"type": "text", "text": message})
+    parts.extend(attachment_blocks)
+    return [HumanMessage(content=parts)]
+
+
 _app = None
 
 
@@ -225,7 +240,7 @@ async def run_agent(agent_input: AgentInput) -> AgentOutput:
     if agent_input.resume_decision:
         final_state = await app.ainvoke(Command(resume=agent_input.resume_decision), config=config)
     else:
-        initial_messages = [HumanMessage(content=agent_input.message)] if agent_input.message else []
+        initial_messages = _build_initial_messages(agent_input.message, agent_input.attachment_blocks)
         final_state = await app.ainvoke(
             {
                 "messages": initial_messages,

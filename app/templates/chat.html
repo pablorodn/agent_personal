@@ -42,9 +42,13 @@
           Aprueba o cancela la acción pendiente antes de continuar.
         </p>
         {% endif %}
-        <form id="chat-form" onsubmit="return submitChat(event, this)" class="mx-auto flex max-w-2xl gap-2">
+        <p id="attachment-error" class="mx-auto mb-2 hidden max-w-2xl text-center text-xs text-red-600 dark:text-red-400"></p>
+        <div id="attachment-preview" class="mx-auto mb-2 hidden max-w-2xl flex-wrap gap-1"></div>
+        <form id="chat-form" onsubmit="return submitChat(event, this)" enctype="multipart/form-data" class="mx-auto flex max-w-2xl gap-2">
           <input type="hidden" name="session_id" value="{{ current_session_id }}" />
-          <input id="chat-input" name="message" type="text" placeholder="Escribe tu mensaje..." autocomplete="off" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />
+          <input type="file" id="chat-attachments" name="attachments" multiple accept="image/png,image/jpeg,image/webp,application/pdf" class="hidden" onchange="handleAttachmentSelection(this)" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} />
+          <button type="button" onclick="document.getElementById('chat-attachments').click()" title="Adjuntar archivo" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="rounded-md border border-neutral-300 px-3 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800">📎</button>
+          <input id="chat-input" name="message" type="text" placeholder="Escribe tu mensaje..." autocomplete="off" onpaste="handleChatPaste(event)" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="flex-1 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900" />
           <button type="submit" id="send-btn" {% if not current_session_id or has_pending_confirmation %}disabled{% endif %} class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">Enviar</button>
         </form>
       </div>
@@ -61,6 +65,128 @@
       .replaceAll("'", "&#39;");
   }
 
+  const ATTACHMENT_LIMITS = {
+    maxCount: 3,
+    maxImageBytes: 5 * 1024 * 1024,
+    maxPdfBytes: 10 * 1024 * 1024,
+    imageTypes: ["image/png", "image/jpeg", "image/webp"],
+    pdfTypes: ["application/pdf"],
+  };
+
+  let pendingAttachments = [];
+
+  function setAttachmentError(message) {
+    const el = document.getElementById("attachment-error");
+    if (!el) return;
+    if (!message) {
+      el.textContent = "";
+      el.classList.add("hidden");
+      return;
+    }
+    el.textContent = message;
+    el.classList.remove("hidden");
+  }
+
+  function validateAttachment(file) {
+    if (ATTACHMENT_LIMITS.imageTypes.includes(file.type)) {
+      if (file.size > ATTACHMENT_LIMITS.maxImageBytes) {
+        return "La imagen '" + file.name + "' supera el límite de 5 MB.";
+      }
+      return null;
+    }
+    if (ATTACHMENT_LIMITS.pdfTypes.includes(file.type)) {
+      if (file.size > ATTACHMENT_LIMITS.maxPdfBytes) {
+        return "El PDF '" + file.name + "' supera el límite de 10 MB.";
+      }
+      return null;
+    }
+    return "Tipo de archivo no permitido: '" + file.name + "'. Solo imágenes (PNG, JPEG, WEBP) o PDF.";
+  }
+
+  function syncAttachmentInput() {
+    const input = document.getElementById("chat-attachments");
+    if (!input) return;
+    const dt = new DataTransfer();
+    pendingAttachments.forEach((file) => dt.items.add(file));
+    input.files = dt.files;
+  }
+
+  function renderAttachmentPreview() {
+    const preview = document.getElementById("attachment-preview");
+    if (!preview) return;
+    if (pendingAttachments.length === 0) {
+      preview.innerHTML = "";
+      preview.classList.add("hidden");
+      preview.classList.remove("flex");
+      return;
+    }
+    preview.classList.remove("hidden");
+    preview.classList.add("flex");
+    preview.innerHTML = pendingAttachments
+      .map(
+        (file, index) =>
+          '<span class="inline-flex items-center gap-1 rounded-full bg-neutral-200 px-2 py-0.5 text-xs dark:bg-neutral-700">' +
+          escapeHtml(file.name) +
+          ' <button type="button" onclick="removeAttachment(' +
+          index +
+          ')" class="text-neutral-500 hover:text-red-500">&times;</button></span>'
+      )
+      .join(" ");
+  }
+
+  function removeAttachment(index) {
+    pendingAttachments.splice(index, 1);
+    syncAttachmentInput();
+    renderAttachmentPreview();
+    setAttachmentError(null);
+  }
+
+  function addAttachments(files) {
+    setAttachmentError(null);
+    for (const file of files) {
+      if (pendingAttachments.length >= ATTACHMENT_LIMITS.maxCount) {
+        setAttachmentError("Máximo " + ATTACHMENT_LIMITS.maxCount + " adjuntos por mensaje.");
+        break;
+      }
+      const error = validateAttachment(file);
+      if (error) {
+        setAttachmentError(error);
+        continue;
+      }
+      pendingAttachments.push(file);
+    }
+    syncAttachmentInput();
+    renderAttachmentPreview();
+  }
+
+  function handleAttachmentSelection(input) {
+    const files = Array.from(input.files || []);
+    pendingAttachments = [];
+    addAttachments(files);
+  }
+
+  function handleChatPaste(event) {
+    const items = event.clipboardData && event.clipboardData.items;
+    if (!items) return;
+    const imageFiles = [];
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (imageFiles.length === 0) return;
+    event.preventDefault();
+    addAttachments(imageFiles);
+  }
+
+  function resetAttachmentsUI() {
+    pendingAttachments = [];
+    syncAttachmentInput();
+    renderAttachmentPreview();
+    setAttachmentError(null);
+  }
+
   function renderOutgoingMessage(form) {
     if (form.dataset.isSubmitting === "true") return;
     const input = document.getElementById("chat-input");
@@ -68,17 +194,24 @@
     const container = document.getElementById("messages-container");
     if (!input || !messages || !container) return;
     const text = (input.value || "").trim();
-    if (!text) return;
+    const attachmentCount = pendingAttachments.length;
+    if (!text && attachmentCount === 0) return;
     input.value = "";
 
     const thinkingId = "thinking-" + Date.now().toString();
     form.dataset.pendingThinkingId = thinkingId;
     form.dataset.isSubmitting = "true";
 
+    const textHtml = text ? '<p class="whitespace-pre-wrap">' + escapeHtml(text) + "</p>" : "";
+    const attachmentHtml =
+      attachmentCount > 0
+        ? '<p class="mt-1 text-xs opacity-80">📎 Se enviaron ' + attachmentCount + " archivo(s)</p>"
+        : "";
+
     const userHtml =
       '<div class="flex justify-end">' +
       '<div class="max-w-[80%] rounded-lg px-4 py-2.5 text-sm leading-relaxed bg-blue-600 text-white">' +
-      '<p class="whitespace-pre-wrap">' + escapeHtml(text) + "</p>" +
+      textHtml + attachmentHtml +
       "</div></div>";
 
     const thinkingHtml =
@@ -111,7 +244,9 @@
     const sessionIdInput = form.querySelector('input[name="session_id"]');
     if (!input || !sessionIdInput) return false;
     if (!(sessionIdInput.value || "").trim()) return false;
-    if (!(input.value || "").trim()) return false;
+    const hasText = !!(input.value || "").trim();
+    const hasAttachments = pendingAttachments.length > 0;
+    if (!hasText && !hasAttachments) return false;
     return true;
   }
 
@@ -134,6 +269,7 @@
     if (!guardChatSubmit(form)) return false;
     renderOutgoingMessage(form);
     const formData = new FormData(form);
+    resetAttachmentsUI();
     const response = await fetch("/api/chat/stream", {
       method: "POST",
       body: formData,
