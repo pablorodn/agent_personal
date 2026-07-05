@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
 
+from app.agent.model import CURATED_CHAT_MODELS, validate_model_selection
 from app.db.queries.messages import get_session_messages
 from app.db.queries.profiles import get_profile
 from app.db.queries.sessions import (
@@ -35,6 +36,8 @@ async def chat_page(
     has_pending_confirmation = False
     if current_session_id:
         has_pending_confirmation = await has_pending_confirmation_for_session(db, current_session_id)
+    stored_default_model = getattr(profile, "default_model", None) if profile else None
+    selected_model = validate_model_selection(stored_default_model, user_id=user_id)
     return templates.TemplateResponse(
         request,
         "chat.html",
@@ -47,6 +50,8 @@ async def chat_page(
             "messages": messages,
             "has_pending_confirmation": has_pending_confirmation,
             "sidebar_open": True,
+            "curated_models": CURATED_CHAT_MODELS,
+            "selected_model": selected_model,
         },
     )
 

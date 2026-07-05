@@ -24,8 +24,16 @@
         {% endfor %}
       </div>
     </section>
+    <section class="space-y-4">
+      <h2 class="text-base font-semibold">Modelo</h2>
+      <select name="default_model" class="w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900">
+        {% for model in curated_models %}
+        <option value="{{ model }}" {% if model == selected_model %}selected{% endif %}>{{ model }}</option>
+        {% endfor %}
+      </select>
+    </section>
     <div class="flex items-center gap-3">
-      <button hx-post="/settings" hx-include="[name='name'], [name='agent_name'], [name='system_prompt'], [name='enabled_tools']" hx-target="#save-status" hx-swap="innerHTML" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+      <button hx-post="/settings" hx-include="[name='name'], [name='agent_name'], [name='system_prompt'], [name='enabled_tools'], [name='default_model']" hx-target="#save-status" hx-swap="innerHTML" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
         Guardar cambios
       </button>
       <span id="save-status" class="text-sm text-green-600"></span>

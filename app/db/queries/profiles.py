@@ -11,6 +11,7 @@ class Profile(BaseModel):
     language: str | None = None
     agent_name: str | None = None
     agent_system_prompt: str | None = None
+    default_model: str | None = None
     onboarding_completed: bool = False
 
 

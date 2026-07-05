@@ -228,15 +228,15 @@ Criterio de aceptación (tests):
 
 ## Fase 10 - Selector de modelo
 
-Estado: PENDIENTE
+Estado: EN PROGRESO (checklist implementado, no cerrada como HECHO — ver `docs/agent_total-changelog.md`)
 
 Checklist:
 
-- [ ] Selector UI con set curado de modelos OpenRouter.
-- [ ] Lista curada inicial fija del selector: `google/gemini-2.5-flash` y `openai/gpt-4o-mini` (única fuente de verdad hasta futura sesión dedicada de documentación).
-- [ ] Parametrizar `create_chat_model()` por modelo elegido.
-- [ ] Validar server-side el modelo recibido contra la lista curada antes de invocar `create_chat_model()`; si no está permitido, ignorar valor y usar default con warning log (sin error duro al usuario).
-- [ ] Persistir preferencia en `profiles.default_model` (opcional por flujo).
+- [x] Selector UI con set curado de modelos OpenRouter.
+- [x] Lista curada inicial fija del selector: `google/gemini-2.5-flash` y `openai/gpt-4o-mini` (única fuente de verdad hasta futura sesión dedicada de documentación).
+- [x] Parametrizar `create_chat_model()` por modelo elegido.
+- [x] Validar server-side el modelo recibido contra la lista curada antes de invocar `create_chat_model()`; si no está permitido, ignorar valor y usar default con warning log (sin error duro al usuario).
+- [x] Persistir preferencia en `profiles.default_model` (opcional por flujo).
 
 Criterio de aceptación (tests):
 

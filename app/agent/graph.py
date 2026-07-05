@@ -12,7 +12,7 @@ from supabase import AsyncClient
 
 from app.agent.checkpointer import get_checkpointer
 from app.agent.langfuse import augment_invoke_config
-from app.agent.model import ainvoke_chat_with_fallback
+from app.agent.model import PRIMARY_CHAT_MODEL, ainvoke_chat_with_fallback
 from app.agent.nodes.compaction_node import compaction_node
 from app.agent.nodes.memory_injection_node import memory_injection_node
 from app.agent.state import AgentState
@@ -36,6 +36,7 @@ class AgentInput:
     system_prompt: str
     db: AsyncClient
     enabled_tools: list[str]
+    chat_model: str = PRIMARY_CHAT_MODEL
     message: str | None = None
     resume_decision: str | None = None
     bypass_confirmation: bool = False
@@ -90,7 +91,10 @@ def parse_pending_confirmation(final_state: dict[str, Any]) -> PendingConfirmati
 async def agent_node(state: AgentState) -> dict[str, list[AIMessage]]:
     current_date = datetime.now(ZoneInfo("America/Bogota")).strftime("%A, %d de %B de %Y, %H:%M")
     system_prompt = f"{state['system_prompt']}\n\nFecha y hora actual: {current_date} (hora Colombia)."
-    response = await ainvoke_chat_with_fallback([SystemMessage(content=system_prompt), *state["messages"]])
+    chat_model = state.get("chat_model") or PRIMARY_CHAT_MODEL
+    response = await ainvoke_chat_with_fallback(
+        [SystemMessage(content=system_prompt), *state["messages"]], primary_model=chat_model
+    )
     return {"messages": [response]}
 
 
@@ -247,6 +251,7 @@ async def run_agent(agent_input: AgentInput) -> AgentOutput:
                 "session_id": agent_input.session_id,
                 "user_id": agent_input.user_id,
                 "system_prompt": agent_input.system_prompt,
+                "chat_model": agent_input.chat_model,
                 "compaction_count": 0,
                 "compaction_failure_count": 0,
                 "tool_iteration_count": 0,

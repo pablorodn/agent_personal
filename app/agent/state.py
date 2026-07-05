@@ -9,6 +9,7 @@ class AgentState(TypedDict):
     session_id: str
     user_id: str
     system_prompt: str
+    chat_model: str
     compaction_count: int
     compaction_failure_count: int
     tool_iteration_count: int

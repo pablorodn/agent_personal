@@ -13,7 +13,27 @@ PRIMARY_CHAT_MODEL = "google/gemini-2.5-flash"
 FALLBACK_CHAT_MODEL = "openai/gpt-4o-mini"
 CHAT_TIMEOUT_SECONDS = 4.0
 
+# Lista curada del selector de modelo (Fase 10). Única fuente de verdad hasta
+# futura sesión dedicada de documentación.
+CURATED_CHAT_MODELS: tuple[str, str] = (PRIMARY_CHAT_MODEL, FALLBACK_CHAT_MODEL)
+
 logger = logging.getLogger(__name__)
+
+
+def validate_model_selection(requested_model: str | None, *, user_id: str) -> str:
+    if requested_model in CURATED_CHAT_MODELS:
+        return requested_model
+    if requested_model:
+        logger.warning(
+            "Requested chat model is not in the curated list; using default.",
+            extra={
+                "event": "model_selection_rejected",
+                "requested_model": requested_model,
+                "fallback_model": PRIMARY_CHAT_MODEL,
+                "user_id": user_id,
+            },
+        )
+    return PRIMARY_CHAT_MODEL
 
 
 def create_chat_model(model_name: str = PRIMARY_CHAT_MODEL) -> ChatOpenAI:
@@ -41,8 +61,11 @@ def create_compaction_model() -> ChatOpenAI:
     )  # type: ignore[call-arg]
 
 
-async def ainvoke_chat_with_fallback(messages: Sequence[Any]) -> AIMessage:
-    primary = create_chat_model(PRIMARY_CHAT_MODEL)
+async def ainvoke_chat_with_fallback(
+    messages: Sequence[Any], primary_model: str = PRIMARY_CHAT_MODEL
+) -> AIMessage:
+    fallback_model = FALLBACK_CHAT_MODEL if primary_model != FALLBACK_CHAT_MODEL else PRIMARY_CHAT_MODEL
+    primary = create_chat_model(primary_model)
     try:
         result = await asyncio.wait_for(primary.ainvoke(messages), timeout=CHAT_TIMEOUT_SECONDS)
         if isinstance(result, AIMessage):
@@ -54,12 +77,12 @@ async def ainvoke_chat_with_fallback(messages: Sequence[Any]) -> AIMessage:
             extra={
                 "event": "chat_model_fallback",
                 "reason": str(exc),
-                "primary_model": PRIMARY_CHAT_MODEL,
-                "fallback_model": FALLBACK_CHAT_MODEL,
+                "primary_model": primary_model,
+                "fallback_model": fallback_model,
             },
         )
 
-    fallback = create_chat_model(FALLBACK_CHAT_MODEL)
+    fallback = create_chat_model(fallback_model)
     result = await fallback.ainvoke(messages)
     if isinstance(result, AIMessage):
         return result

@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
 
+from app.agent.model import CURATED_CHAT_MODELS, validate_model_selection
 from app.db.queries.profiles import get_profile, upsert_profile
 from app.db.queries.tools import list_enabled_tool_ids, replace_enabled_tools
 from app.dependencies import get_current_user_id, get_db
@@ -29,6 +30,8 @@ async def settings_page(
             else ""
         ),
     }
+    stored_default_model = getattr(profile, "default_model", None) if profile else None
+    selected_model = validate_model_selection(stored_default_model, user_id=user_id)
     return templates.TemplateResponse(
         request,
         "settings.html",
@@ -39,6 +42,8 @@ async def settings_page(
             "profile": profile_payload,
             "tool_catalog": TOOL_CATALOG,
             "enabled_tool_ids": enabled_tool_ids,
+            "curated_models": CURATED_CHAT_MODELS,
+            "selected_model": selected_model,
         },
     )
 
@@ -52,16 +57,19 @@ async def settings_save(
     agent_name: str = Form(default=""),
     system_prompt: str = Form(default=""),
     enabled_tools: list[str] = Form(default=[]),
+    default_model: str = Form(default=""),
 ):
-    await upsert_profile(
-        db,
-        {
-            "id": user_id,
-            "name": name,
-            "agent_name": agent_name,
-            "agent_system_prompt": system_prompt,
-        },
-    )
+    profile_payload: dict[str, object] = {
+        "id": user_id,
+        "name": name,
+        "agent_name": agent_name,
+        "agent_system_prompt": system_prompt,
+    }
+    if default_model in CURATED_CHAT_MODELS:
+        profile_payload["default_model"] = default_model
+    elif default_model:
+        validate_model_selection(default_model, user_id=user_id)
+    await upsert_profile(db, profile_payload)
     catalog_ids = {tool.id for tool in TOOL_CATALOG}
     selected_tool_ids = [tool_id for tool_id in enabled_tools if tool_id in catalog_ids]
     await replace_enabled_tools(db, user_id, selected_tool_ids)

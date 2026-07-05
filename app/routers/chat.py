@@ -11,8 +11,9 @@ from supabase import AsyncClient
 
 from app.agent.graph import AgentInput, run_agent
 from app.agent.memory_flush import flush_session_memory
+from app.agent.model import validate_model_selection
 from app.db.queries.messages import add_message
-from app.db.queries.profiles import get_profile
+from app.db.queries.profiles import get_profile, upsert_profile
 from app.db.queries.sessions import get_session_by_id
 from app.db.queries.tool_calls import get_pending_tool_call
 from app.db.queries.tools import list_enabled_tool_ids
@@ -52,6 +53,30 @@ def _attachment_note_payload(count: int, kinds: list[str]) -> dict[str, Any] | N
     return {"type": "attachment_note", "count": count, "kinds": kinds}
 
 
+def _resolve_chat_model(
+    requested_model: str, stored_default_model: str | None, *, db: AsyncClient, user_id: str
+) -> str:
+    resolved = validate_model_selection(requested_model.strip() or stored_default_model, user_id=user_id)
+    if resolved != stored_default_model:
+        asyncio.create_task(_persist_default_model(db=db, user_id=user_id, model_name=resolved))
+    return resolved
+
+
+async def _persist_default_model(db: AsyncClient, user_id: str, model_name: str) -> None:
+    try:
+        await upsert_profile(db, {"id": user_id, "default_model": model_name})
+    except Exception as exc:  # pragma: no cover - external services
+        logger.warning(
+            "Default model preference persistence skipped due to recoverable error.",
+            extra={
+                "event": "default_model_persist_error",
+                "reason": str(exc),
+                "user_id": user_id,
+                "model_name": model_name,
+            },
+        )
+
+
 def _build_user_system_prompt(
     base_prompt: str,
     *,
@@ -78,6 +103,7 @@ async def chat(
     request: Request,
     message: str = Form(""),
     session_id: str = Form(""),
+    chat_model: str = Form(""),
     attachments: list[UploadFile] = File(default=[]),
     db: AsyncClient = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
@@ -126,6 +152,12 @@ async def chat(
         language=profile.language if profile else None,
         timezone=profile.timezone if profile else None,
     )
+    resolved_chat_model = _resolve_chat_model(
+        chat_model,
+        getattr(profile, "default_model", None) if profile else None,
+        db=db,
+        user_id=user_id,
+    )
     agent_start = time.perf_counter()
     result = await run_agent(
         AgentInput(
@@ -134,6 +166,7 @@ async def chat(
             system_prompt=system_prompt,
             db=db,
             enabled_tools=enabled_tools,
+            chat_model=resolved_chat_model,
             message=clean_message,
             attachment_blocks=attachment_blocks or None,
         )
@@ -179,6 +212,7 @@ async def chat_stream(
     request: Request,
     message: str = Form(""),
     session_id: str = Form(""),
+    chat_model: str = Form(""),
     attachments: list[UploadFile] = File(default=[]),
     db: AsyncClient = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
@@ -232,6 +266,12 @@ async def chat_stream(
             language=profile.language if profile else None,
             timezone=profile.timezone if profile else None,
         )
+        resolved_chat_model = _resolve_chat_model(
+            chat_model,
+            getattr(profile, "default_model", None) if profile else None,
+            db=db,
+            user_id=user_id,
+        )
 
         agent_start = time.perf_counter()
         agent_task = asyncio.create_task(
@@ -242,6 +282,7 @@ async def chat_stream(
                     system_prompt=system_prompt,
                     db=db,
                     enabled_tools=enabled_tools,
+                    chat_model=resolved_chat_model,
                     message=clean_message,
                     attachment_blocks=attachment_blocks or None,
                 )
