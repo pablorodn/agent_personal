@@ -67,8 +67,8 @@ No se considera pendiente en esta etapa.
 | Crear sesión | `POST /api/sessions` | `#session-list` | `afterbegin` | Partial de sesión |
 | Cambiar sesión | `GET /chat/session/{id}` | `#messages` | `innerHTML` | Lista de mensajes |
 | Limpiar sesión | `POST /api/sessions/{id}/clear` | `#messages` | `innerHTML` | Vacío |
-| Archivar sesión | `POST /api/sessions/{id}/archive` + `hx-vals` con `current_session_id` | `#session-item-{id}` | `outerHTML` | `HX-Redirect: /chat` si era la sesión actual; si no, partial vacío que remueve item |
-| Eliminar sesión | `POST /api/sessions/{id}/delete` + `hx-vals` con `current_session_id` + `hx-confirm` | `#session-item-{id}` | `outerHTML` | `HX-Redirect: /chat` si era la sesión actual; si no, partial vacío que remueve item |
+| Archivar sesión | `POST /api/sessions/{id}/archive` + `hx-vals` con `current_session_id` | `closest [data-session-item]` | `outerHTML` | `HX-Redirect: /chat` si era la sesión actual; si no, partial vacío que remueve item |
+| Eliminar sesión | `POST /api/sessions/{id}/delete` + `hx-vals` con `current_session_id` + `hx-confirm` | `closest [data-session-item]` | `outerHTML` | `HX-Redirect: /chat` si era la sesión actual; si no, partial vacío que remueve item |
 
 ## 6) Adjuntos multimodales (objetivo de UI + HTMX)
 

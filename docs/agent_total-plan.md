@@ -332,15 +332,15 @@ Criterio de aceptación (tests):
 
 ## Fase 15 - Consolidación de plantilla
 
-Estado: PENDIENTE
+Estado: HECHO
 
 Checklist:
 
-- [ ] Confirmar que las 14 fases anteriores (0-14) están en HECHO.
-- [ ] Revisar `docs/agent_total-changelog.md` completo: verificar que toda discrepancia de spec registrada ahí quedó efectivamente reflejada en la documentación congelada vigente (`README.md`, `technical-brief.md`, `ui-design.md`) - es decir, que ninguna decisión tomada durante la implementación quedó como "solo en el changelog" sin sincronizarse con la fuente de verdad.
-- [ ] Si se encuentra alguna discrepancia sin sincronizar: esta es la única sesión donde se autoriza corregir documentación fuera de una "sesión dedicada" ad-hoc individual, porque es en sí misma la sesión dedicada de cierre. Aplicar las correcciones necesarias.
-- [ ] Producir un resumen "as-built" corto (puede vivir al final de este mismo plan o como sección nueva en `README.md`): qué se construyó realmente, qué quedó fuera de alcance a propósito, y dónde está el changelog completo para quien reutilice este repo como plantilla.
-- [ ] Confirmar suite completa en verde una última vez: `ruff check .`, `mypy app/`, `pytest -q`.
+- [x] Confirmar que las 14 fases anteriores (0-14) están en HECHO.
+- [x] Revisar `docs/agent_total-changelog.md` completo: verificar que toda discrepancia de spec registrada ahí quedó efectivamente reflejada en la documentación congelada vigente (`README.md`, `technical-brief.md`, `ui-design.md`) - es decir, que ninguna decisión tomada durante la implementación quedó como "solo en el changelog" sin sincronizarse con la fuente de verdad.
+- [x] Si se encuentra alguna discrepancia sin sincronizar: esta es la única sesión donde se autoriza corregir documentación fuera de una "sesión dedicada" ad-hoc individual, porque es en sí misma la sesión dedicada de cierre. Aplicar las correcciones necesarias.
+- [x] Producir un resumen "as-built" corto (puede vivir al final de este mismo plan o como sección nueva en `README.md`): qué se construyó realmente, qué quedó fuera de alcance a propósito, y dónde está el changelog completo para quien reutilice este repo como plantilla.
+- [x] Confirmar suite completa en verde una última vez: `ruff check .`, `mypy app/`, `pytest -q`.
 
 Criterio de aceptación:
 

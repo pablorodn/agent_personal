@@ -21,21 +21,28 @@ El detalle de decisiones de implementación y de cómo se resolvió cada discrep
 
 - Autenticación web: login, signup, logout.
 - Onboarding wizard de 4 pasos (perfil, agente, herramientas, revisión).
-- Chat web multi-sesión con sidebar.
+- Chat web multi-sesión con sidebar, título automático de sesión, archivado y hard-delete con limpieza de checkpointer.
 - Runtime LangGraph con grafo `memory_injection -> compaction -> agent -> tools`.
 - Checkpointing con `AsyncPostgresSaver`.
 - HITL genérico con `interrupt()` y `Command(resume=...)`, usando doble ID (`tool_calls.id` y `model_tool_call_id`).
 - File tools con `FILE_TOOLS_ENABLED` y confinamiento de paths.
-- Estructura de catálogo/política de riesgo como mecanismo central.
+- Estructura de catálogo/política de riesgo como mecanismo central, con punto de extensión MCP demostrado (registro vía catálogo + adapter, sin tocar `graph.py`).
+- Memoria de largo plazo end-to-end: inyección real en el prompt (`memory_injection_node`) con `match_memories()` invocado en el flujo real y filtro de privacidad antes de persistir.
+- Compactación de contexto en dos etapas (resumen LLM + truncado duro de respaldo) con circuit breaker.
+- Langfuse conectado al `invoke` real del grafo.
+- Evaluaciones (`evals/run_faq_experiment.py`) corriendo contra el runtime real (`run_agent()`), no un stub.
+- Adjuntos multimodales (imagen + PDF) y selector de modelo con persistencia en `profiles.default_model`.
+- Hardening de cierre: arranque vía `lifespan`, cookies `secure`/`https_only` condicionales por `ENVIRONMENT`.
 
-### Pendiente o incompleto hoy (debe quedar explícito)
+### Fuera de alcance a propósito (no es "pendiente", es decisión consciente)
 
-- Compactación: existe implementación parcial; hoy solo está activa la etapa 1.
-- Memoria de largo plazo end-to-end: la especificación completa existe, pero `memory_injection_node` actualmente es no-op.
-- Recuperación vectorial: `match_memories()` hoy no se invoca en el flujo real.
-- Mismatch conocido: en código se usa `query_user_id`, mientras que el RPC de `migrations/00004_long_term_memory.sql` espera `match_user_id`.
-- Langfuse: existe helper para callback, pero `create_langfuse_callback()` no está conectado al `invoke` del grafo.
-- Evaluaciones: `evals/run_faq_experiment.py` es un stub y no usa el runtime real.
+Ver `docs/agent_total-as-built.md` para el detalle completo. En síntesis:
+
+- Pantalla de archivados/recuperación de sesiones.
+- Click-outside-to-close en el menú de 3 puntos de sesión.
+- Integración MCP real (el punto de extensión es un scaffolding stub, sin cliente/SDK MCP real).
+- Renderizado de markdown general en mensajes (solo bloques de código con `highlight.js`).
+- Comportamiento ideal de `microcompact` con marcadores en vez de truncado duro (ver §7).
 
 ## 3) Arquitectura base
 
@@ -86,9 +93,9 @@ Tabla canónica en alcance para `agent_total`:
 - Adjuntos multimodales en chat desde `/chat`, enviados por la UI vía `POST /api/chat/stream` (también soportado por `POST /api/chat`).
 - Selector de modelo en chat, resuelto y persistido en ambas rutas de envío (`POST /api/chat` y `POST /api/chat/stream`) en `profiles.default_model`.
 
-### Sesiones: título automático, archivar y eliminar (plan Fase 13)
+### Sesiones: título automático, archivar y eliminar
 
-Cambios de datos definidos para `migrations/00007_sessions_title_and_archive.sql` (Fase 13 del plan, migración independiente):
+Cambios de datos aplicados vía `migrations/00007_sessions_title_and_archive.sql` (Fase 13, migración independiente, ya aplicada contra Supabase real):
 
 - Agregar `agent_sessions.title` (`text`, nullable, default `null`).
 - Ampliar `agent_sessions.status` para aceptar `archived` además de `active` y `closed`.
@@ -97,11 +104,18 @@ Cambios de datos definidos para `migrations/00007_sessions_title_and_archive.sql
 Flujo de generación de título:
 
 - Se usa `create_compaction_model()` para proponer un título corto (máx. 6 palabras, sin comillas ni punto final) desde el primer mensaje de usuario.
+- Definición operativa de "primer mensaje de usuario": el primer `HumanMessage` de la sesión con `content` no vacío. Los mensajes solo-adjuntos (sin texto, ver §10.1) se ignoran al elegir la semilla; si ningún mensaje de usuario tiene texto todavía, no se genera título en ese turno (`title` sigue `NULL`).
 - Trigger de ejecución: tras turnos completados sin confirmación pendiente, en el mismo punto de fire-and-forget donde corre `flush_session_memory`, solo si `agent_sessions.title IS NULL`.
+- Reintentos: sin límite — se reintenta en cada turno siguiente mientras `title IS NULL` (no hay contador de intentos; la migración 00007 solo agrega la columna `title`).
 - Idempotencia: persistir con `UPDATE ... WHERE id = session_id AND title IS NULL`.
 - Fallos: patrón `try/except` con warning log; nunca rompe el turno de chat.
 - Fallback UI: mientras `title` sea `NULL`, la sidebar sigue mostrando fecha formateada (`format_session_date`).
-- El hard-delete también elimina el estado persistido del checkpointer de LangGraph para ese `thread_id`; el archivado (`/archive`) NO afecta el estado del checkpointer.
+
+Archivar y eliminar:
+
+- Confirmación en UI: el botón "Eliminar" usa `hx-confirm` con el texto exacto *"¿Eliminar esta conversación? Esta acción no se puede deshacer."*; el botón "Archivar" no requiere confirmación.
+- Orden de operaciones del hard-delete (`POST /api/sessions/{id}/delete`): se limpia primero, best-effort, el estado del checkpointer de LangGraph para ese `thread_id` (`AsyncPostgresSaver.adelete_thread`); recién después se ejecuta el `DELETE FROM agent_sessions` real. Este orden es intencional: maximiza que el contenido de chat quede efectivamente inaccesible tras el borrado — si el checkpointer fallara y el orden fuera el inverso, quedaría contenido recuperable vía checkpointer con la sesión ya "invisible" en la UI, que es exactamente el riesgo que este mecanismo busca evitar. Si la limpieza del checkpointer falla, no bloquea el borrado de `agent_sessions` (se registra warning).
+- El archivado (`/archive`) NO afecta el estado del checkpointer, solo cambia `status='archived'`.
 
 Aclaración de experiencia de usuario:
 
@@ -300,14 +314,13 @@ Para una tool proveniente de servidor MCP se sigue el mismo patrón: catálogo +
 
 ## 12) Estado operativo y próximos pasos
 
-Pendientes principales para la etapa:
+Las 15 fases de `docs/agent_total-plan.md` están en `HECHO`. No hay pendientes bloqueantes
+para la plantilla en su alcance actual; lo que quedó deliberadamente fuera de alcance está
+listado en `docs/agent_total-as-built.md` ("Qué quedó fuera de alcance a propósito"), no
+como trabajo pendiente sino como decisión consciente de scope.
 
-- Reducir el catálogo de tools al set mínimo de `agent_total`.
-- Completar memoria real e inyección.
-- Completar compactación etapa 2.
-- Conectar Langfuse al invoke real.
-- Reemplazar evaluaciones stub por evaluaciones reales.
-- Incorporar adjuntos multimodales y selector de modelo.
-- Añadir scaffolding de extensión MCP sin tocar el runtime del grafo.
+Para quien extienda esta plantilla: el punto de extensión de tools (catálogo + adapter, ver
+§10.4) es el mecanismo pensado para agregar nuevas integraciones sin tocar `graph.py`.
 
-La ejecución por fases vive en `docs/agent_total-plan.md`.
+La ejecución por fases vive en `docs/agent_total-plan.md`; el resumen consolidado y la
+lección aprendida principal del proyecto viven en `docs/agent_total-as-built.md`.
