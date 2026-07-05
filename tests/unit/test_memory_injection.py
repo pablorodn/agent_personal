@@ -1,7 +1,7 @@
 import pytest
 from langchain_core.messages import HumanMessage
 
-from app.agent.nodes.memory_injection_node import memory_injection_node
+from app.agent.nodes.memory_injection_node import _format_memory_block, memory_injection_node
 from app.db.queries import memories as memories_module
 
 
@@ -15,8 +15,8 @@ async def test_memory_injection_with_existing_memories(monkeypatch):
     async def _fake_match_memories(_db, user_id, query_embedding, limit=8):
         calls["match"] = {"user_id": user_id, "query_embedding": query_embedding, "limit": limit}
         return [
-            {"id": "mem-1", "content": "Prefiere respuestas en español"},
-            {"id": "mem-2", "content": "Le gusta respuestas breves"},
+            {"id": "mem-1", "content": "Prefiere respuestas en español", "type": "episodic"},
+            {"id": "mem-2", "content": "Le gusta respuestas breves", "type": "episodic"},
         ]
 
     async def _fake_increment(_db, memory_ids):
@@ -111,3 +111,35 @@ async def test_match_memories_uses_match_user_id_rpc_parameter():
         "match_count": 8,
     }
     assert result == [{"id": "mem-1", "content": "dato"}]
+
+
+def test_format_memory_block_separates_sections_by_type():
+    memories = [
+        {"id": "mem-1", "content": "Prefiere respuestas en español", "type": "episodic"},
+        {"id": "mem-2", "content": "Se llama Pablo y es ingeniero", "type": "semantic"},
+    ]
+
+    block = _format_memory_block(memories)
+
+    assert "[HECHOS Y PREFERENCIAS DEL USUARIO]" in block
+    assert "[MEMORIA DEL USUARIO]" in block
+    assert block.index("[HECHOS Y PREFERENCIAS DEL USUARIO]") < block.index("Se llama Pablo y es ingeniero")
+    assert block.index("[MEMORIA DEL USUARIO]") < block.index("Prefiere respuestas en español")
+
+
+def test_format_memory_block_omits_empty_semantic_section():
+    memories = [{"id": "mem-1", "content": "Hoy hablamos de viajes", "type": "episodic"}]
+
+    block = _format_memory_block(memories)
+
+    assert "[HECHOS Y PREFERENCIAS DEL USUARIO]" not in block
+    assert "[MEMORIA DEL USUARIO]" in block
+
+
+def test_format_memory_block_omits_empty_episodic_section():
+    memories = [{"id": "mem-1", "content": "Se llama Pablo", "type": "semantic"}]
+
+    block = _format_memory_block(memories)
+
+    assert "[MEMORIA DEL USUARIO]" not in block
+    assert "[HECHOS Y PREFERENCIAS DEL USUARIO]" in block

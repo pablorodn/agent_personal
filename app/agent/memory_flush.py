@@ -3,6 +3,7 @@ import logging
 from supabase import AsyncClient
 
 from app.agent.embeddings import generate_embedding
+from app.agent.memory_classifier import classify_memory_type
 from app.db.queries.memories import save_memory
 from app.db.queries.messages import get_session_messages
 from app.services.memory_policy import can_store_memory
@@ -23,8 +24,9 @@ async def flush_session_memory(db: AsyncClient, user_id: str, session_id: str) -
             return
         if not can_store_memory(latest):
             return
+        memory_type = await classify_memory_type(latest)
         embedding = await generate_embedding(latest)
-        await save_memory(db, user_id=user_id, memory_type="episodic", content=latest, embedding=embedding)
+        await save_memory(db, user_id=user_id, memory_type=memory_type, content=latest, embedding=embedding)
     except Exception as exc:  # pragma: no cover - external services
         logger.warning(
             "Memory flush skipped due to recoverable error.",
