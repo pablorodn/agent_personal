@@ -1,9 +1,28 @@
+import json
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 from app.dependencies import get_current_user_id, get_db
 from app.main import app
+
+
+def _parse_sse_events(text: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in text.split("\n\n"):
+        block = block.strip("\n")
+        if not block:
+            continue
+        event_name = None
+        data = None
+        for line in block.splitlines():
+            if line.startswith("event: "):
+                event_name = line[len("event: ") :]
+            elif line.startswith("data: "):
+                data = json.loads(line[len("data: ") :])
+        if event_name is not None:
+            events.append((event_name, data))
+    return events
 
 
 def test_chat_rejects_invalid_payload_with_controlled_html_response(
@@ -73,4 +92,186 @@ def test_chat_accepts_valid_payload_without_422(monkeypatch, patch_auth_middlewa
     )
     assert response.status_code == 200
     assert "ok" in response.text
+    app.dependency_overrides.clear()
+
+
+def test_chat_stream_rejects_invalid_payload_with_sse_error(
+    monkeypatch, patch_auth_middleware, auth_cookie
+):
+    async def _fake_db():
+        return object()
+
+    async def _fake_user_id():
+        return "user-1"
+
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user_id] = _fake_user_id
+    monkeypatch.setattr("app.routers.chat.get_session_by_id", lambda *_args, **_kwargs: None)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat/stream",
+        cookies=auth_cookie,
+        data={"message": " ", "session_id": ""},
+    )
+    assert response.status_code == 200
+    events = _parse_sse_events(response.text)
+    assert events[0][0] == "error"
+    assert "No pude procesar el mensaje" in events[0][1]["message"]
+    app.dependency_overrides.clear()
+
+
+def test_chat_stream_accepts_valid_payload_and_streams_message_html(
+    monkeypatch, patch_auth_middleware, auth_cookie
+):
+    async def _fake_db():
+        return object()
+
+    async def _fake_user_id():
+        return "user-1"
+
+    async def _fake_session(_db, _session_id):
+        return SimpleNamespace(id="session-1", user_id="user-1", title=None)
+
+    async def _fake_add_message(_db, _session_id, role, content, structured_payload=None):
+        _ = structured_payload
+        return SimpleNamespace(id="msg-1", role=role, content=content)
+
+    async def _fake_profile(_db, _user_id):
+        return SimpleNamespace(
+            name="Pablo", language="es", timezone="America/Bogota", agent_system_prompt="Sistema"
+        )
+
+    async def _fake_tools(_db, _user_id):
+        return ["read_file"]
+
+    async def _fake_run_agent(_input):
+        from app.agent.graph import AgentOutput
+
+        return AgentOutput(response="ok", tool_calls=[])
+
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user_id] = _fake_user_id
+    monkeypatch.setattr("app.routers.chat.get_session_by_id", _fake_session)
+    monkeypatch.setattr("app.routers.chat.add_message", _fake_add_message)
+    monkeypatch.setattr("app.routers.chat.get_profile", _fake_profile)
+    monkeypatch.setattr("app.routers.chat.list_enabled_tool_ids", _fake_tools)
+    monkeypatch.setattr("app.routers.chat.run_agent", _fake_run_agent)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat/stream",
+        cookies=auth_cookie,
+        data={"message": "hola", "session_id": "session-1"},
+    )
+    assert response.status_code == 200
+    events = _parse_sse_events(response.text)
+    html_payload = next(data for name, data in events if name == "message_html")
+    assert "ok" in html_payload["html"]
+    app.dependency_overrides.clear()
+
+
+def test_chat_returns_404_when_session_not_found(monkeypatch, patch_auth_middleware, auth_cookie):
+    async def _fake_db():
+        return object()
+
+    async def _fake_user_id():
+        return "user-1"
+
+    async def _fake_session_none(_db, _session_id):
+        return None
+
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user_id] = _fake_user_id
+    monkeypatch.setattr("app.routers.chat.get_session_by_id", _fake_session_none)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat",
+        cookies=auth_cookie,
+        data={"message": "hola", "session_id": "missing-session"},
+    )
+    assert response.status_code == 404
+    app.dependency_overrides.clear()
+
+
+def test_chat_returns_403_when_session_belongs_to_another_user(
+    monkeypatch, patch_auth_middleware, auth_cookie
+):
+    async def _fake_db():
+        return object()
+
+    async def _fake_user_id():
+        return "user-1"
+
+    async def _fake_session_other_user(_db, _session_id):
+        return SimpleNamespace(id="session-1", user_id="someone-else", title=None)
+
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user_id] = _fake_user_id
+    monkeypatch.setattr("app.routers.chat.get_session_by_id", _fake_session_other_user)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat",
+        cookies=auth_cookie,
+        data={"message": "hola", "session_id": "session-1"},
+    )
+    assert response.status_code == 403
+    app.dependency_overrides.clear()
+
+
+def test_chat_stream_emits_sse_error_when_session_not_found(
+    monkeypatch, patch_auth_middleware, auth_cookie
+):
+    async def _fake_db():
+        return object()
+
+    async def _fake_user_id():
+        return "user-1"
+
+    async def _fake_session_none(_db, _session_id):
+        return None
+
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user_id] = _fake_user_id
+    monkeypatch.setattr("app.routers.chat.get_session_by_id", _fake_session_none)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat/stream",
+        cookies=auth_cookie,
+        data={"message": "hola", "session_id": "missing-session"},
+    )
+    assert response.status_code == 200
+    events = _parse_sse_events(response.text)
+    assert events == [("error", {"message": "Sesion no encontrada."})]
+    app.dependency_overrides.clear()
+
+
+def test_chat_stream_emits_sse_error_when_session_belongs_to_another_user(
+    monkeypatch, patch_auth_middleware, auth_cookie
+):
+    async def _fake_db():
+        return object()
+
+    async def _fake_user_id():
+        return "user-1"
+
+    async def _fake_session_other_user(_db, _session_id):
+        return SimpleNamespace(id="session-1", user_id="someone-else", title=None)
+
+    app.dependency_overrides[get_db] = _fake_db
+    app.dependency_overrides[get_current_user_id] = _fake_user_id
+    monkeypatch.setattr("app.routers.chat.get_session_by_id", _fake_session_other_user)
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat/stream",
+        cookies=auth_cookie,
+        data={"message": "hola", "session_id": "session-1"},
+    )
+    assert response.status_code == 200
+    events = _parse_sse_events(response.text)
+    assert events == [("error", {"message": "Sesion invalida para este usuario."})]
     app.dependency_overrides.clear()

@@ -2,7 +2,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
@@ -15,7 +15,7 @@ from app.agent.model import validate_model_selection
 from app.agent.session_title import generate_session_title
 from app.db.queries.messages import add_message
 from app.db.queries.profiles import get_profile, upsert_profile
-from app.db.queries.sessions import get_session_by_id
+from app.db.queries.sessions import AgentSession, get_session_by_id
 from app.db.queries.tool_calls import get_pending_tool_call
 from app.db.queries.tools import list_enabled_tool_ids
 from app.dependencies import get_current_user_id, get_db
@@ -126,6 +126,71 @@ def _build_user_system_prompt(
     return f"{base_prompt}\n\n{profile_section}{SYSTEM_PROMPT_GUARDRAILS}{LATENCY_STYLE_SUFFIX}"
 
 
+_SessionLookupError = Literal["not_found", "forbidden"]
+
+
+def _is_chat_request_empty(session_id: str, clean_message: str, files: list[UploadFile]) -> bool:
+    return not session_id.strip() or (not clean_message and not files)
+
+
+async def _lookup_owned_session(
+    db: AsyncClient, session_id: str, user_id: str
+) -> tuple[AgentSession | None, _SessionLookupError | None]:
+    session = await get_session_by_id(db, session_id)
+    if not session:
+        return None, "not_found"
+    if session.user_id != user_id:
+        return None, "forbidden"
+    return session, None
+
+
+async def _build_attachment_blocks_or_error(
+    files: list[UploadFile],
+) -> tuple[list[dict[str, Any]], list[str], str | None]:
+    try:
+        attachment_blocks, kinds = await build_attachment_blocks(files)
+    except AttachmentValidationError as exc:
+        return [], [], str(exc)
+    return attachment_blocks, kinds, None
+
+
+async def _persist_user_message(
+    db: AsyncClient,
+    session_id: str,
+    clean_message: str,
+    files: list[UploadFile],
+    kinds: list[str],
+) -> None:
+    await add_message(
+        db,
+        session_id,
+        "user",
+        clean_message,
+        structured_payload=_attachment_note_payload(len(files), kinds),
+    )
+
+
+async def _fetch_profile_and_enabled_tools(db: AsyncClient, user_id: str):
+    return await asyncio.gather(
+        get_profile(db, user_id),
+        list_enabled_tool_ids(db, user_id),
+    )
+
+
+def _build_system_prompt_for_profile(profile: Any) -> str:
+    base_prompt = (
+        profile.agent_system_prompt
+        if profile and profile.agent_system_prompt
+        else "Eres un asistente útil."
+    )
+    return _build_user_system_prompt(
+        base_prompt,
+        user_name=profile.name if profile else None,
+        language=profile.language if profile else None,
+        timezone=profile.timezone if profile else None,
+    )
+
+
 @router.post("/chat", response_class=HTMLResponse)
 async def chat(
     request: Request,
@@ -140,7 +205,7 @@ async def chat(
     db_start = time.perf_counter()
     clean_message = message.strip()
     files = real_attachments(attachments)
-    if not session_id.strip() or (not clean_message and not files):
+    if _is_chat_request_empty(session_id, clean_message, files):
         return Response(
             content=_error_fragment(
                 "No pude procesar el mensaje. Verifica la sesion activa e intenta de nuevo."
@@ -148,38 +213,20 @@ async def chat(
             media_type="text/html",
             status_code=400,
         )
-    session = await get_session_by_id(db, session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if session.user_id != user_id:
+    session, session_error = await _lookup_owned_session(db, session_id, user_id)
+    if session is None:
+        if session_error == "not_found":
+            raise HTTPException(status_code=404, detail="Session not found")
         raise HTTPException(status_code=403, detail="Session does not belong to user")
-    try:
-        attachment_blocks, kinds = await build_attachment_blocks(files)
-    except AttachmentValidationError as exc:
-        return Response(content=_error_fragment(str(exc)), media_type="text/html", status_code=400)
-    await add_message(
-        db,
-        session_id,
-        "user",
-        clean_message,
-        structured_payload=_attachment_note_payload(len(files), kinds),
-    )
-    profile, enabled_tools = await asyncio.gather(
-        get_profile(db, user_id),
-        list_enabled_tool_ids(db, user_id),
-    )
+    attachment_blocks, kinds, attachment_error = await _build_attachment_blocks_or_error(files)
+    if attachment_error is not None:
+        return Response(
+            content=_error_fragment(attachment_error), media_type="text/html", status_code=400
+        )
+    await _persist_user_message(db, session_id, clean_message, files, kinds)
+    profile, enabled_tools = await _fetch_profile_and_enabled_tools(db, user_id)
     db_ms = round((time.perf_counter() - db_start) * 1000, 2)
-    base_prompt = (
-        profile.agent_system_prompt
-        if profile and profile.agent_system_prompt
-        else "Eres un asistente útil."
-    )
-    system_prompt = _build_user_system_prompt(
-        base_prompt,
-        user_name=profile.name if profile else None,
-        language=profile.language if profile else None,
-        timezone=profile.timezone if profile else None,
-    )
+    system_prompt = _build_system_prompt_for_profile(profile)
     resolved_chat_model = _resolve_chat_model(
         chat_model,
         getattr(profile, "default_model", None) if profile else None,
@@ -251,51 +298,31 @@ async def chat_stream(
         total_start = time.perf_counter()
         clean_message = message.strip()
         files = real_attachments(attachments)
-        if not session_id.strip() or (not clean_message and not files):
+        if _is_chat_request_empty(session_id, clean_message, files):
             yield _sse(
                 "error",
                 {"message": "No pude procesar el mensaje. Verifica la sesion activa e intenta de nuevo."},
             )
             return
-        session = await get_session_by_id(db, session_id)
-        if not session:
-            yield _sse("error", {"message": "Sesion no encontrada."})
+        session, session_error = await _lookup_owned_session(db, session_id, user_id)
+        if session is None:
+            if session_error == "not_found":
+                yield _sse("error", {"message": "Sesion no encontrada."})
+            else:
+                yield _sse("error", {"message": "Sesion invalida para este usuario."})
             return
-        if session.user_id != user_id:
-            yield _sse("error", {"message": "Sesion invalida para este usuario."})
+        attachment_blocks, kinds, attachment_error = await _build_attachment_blocks_or_error(files)
+        if attachment_error is not None:
+            yield _sse("error", {"message": attachment_error})
             return
-        try:
-            attachment_blocks, kinds = await build_attachment_blocks(files)
-        except AttachmentValidationError as exc:
-            yield _sse("error", {"message": str(exc)})
-            return
-        await add_message(
-            db,
-            session_id,
-            "user",
-            clean_message,
-            structured_payload=_attachment_note_payload(len(files), kinds),
-        )
+        await _persist_user_message(db, session_id, clean_message, files, kinds)
 
         db_start = time.perf_counter()
-        profile, enabled_tools = await asyncio.gather(
-            get_profile(db, user_id),
-            list_enabled_tool_ids(db, user_id),
-        )
+        profile, enabled_tools = await _fetch_profile_and_enabled_tools(db, user_id)
         db_ms = round((time.perf_counter() - db_start) * 1000, 2)
         yield _sse("status", {"phase": "context_ready", "db_ms": db_ms})
 
-        base_prompt = (
-            profile.agent_system_prompt
-            if profile and profile.agent_system_prompt
-            else "Eres un asistente útil."
-        )
-        system_prompt = _build_user_system_prompt(
-            base_prompt,
-            user_name=profile.name if profile else None,
-            language=profile.language if profile else None,
-            timezone=profile.timezone if profile else None,
-        )
+        system_prompt = _build_system_prompt_for_profile(profile)
         resolved_chat_model = _resolve_chat_model(
             chat_model,
             getattr(profile, "default_model", None) if profile else None,
