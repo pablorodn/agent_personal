@@ -1,7 +1,12 @@
 import pytest
 from langchain_core.messages import HumanMessage
 
-from app.agent.nodes.memory_injection_node import _format_memory_block, memory_injection_node
+from app.agent.nodes.memory_injection_node import (
+    MEMORY_BLOCK_END,
+    MEMORY_BLOCK_START,
+    _format_memory_block,
+    memory_injection_node,
+)
 from app.db.queries import memories as memories_module
 
 
@@ -168,3 +173,32 @@ def test_format_memory_block_omits_empty_procedural_section():
     block = _format_memory_block(memories)
 
     assert "[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]" not in block
+
+
+def test_format_memory_block_wraps_content_with_trust_delimiter():
+    memories = [{"id": "mem-1", "content": "Se llama Pablo", "type": "semantic"}]
+
+    block = _format_memory_block(memories)
+
+    assert block.startswith(MEMORY_BLOCK_START)
+    assert block.endswith(MEMORY_BLOCK_END)
+    start_idx = block.index(MEMORY_BLOCK_START)
+    header_idx = block.index("[HECHOS Y PREFERENCIAS DEL USUARIO]")
+    end_idx = block.index(MEMORY_BLOCK_END)
+    assert start_idx < header_idx < end_idx
+
+
+def test_format_memory_block_empty_memories_has_no_delimiter():
+    block = _format_memory_block([])
+
+    assert block == ""
+    assert MEMORY_BLOCK_START not in block
+    assert MEMORY_BLOCK_END not in block
+
+
+def test_format_memory_block_all_blank_content_has_no_delimiter():
+    memories = [{"id": "mem-1", "content": "   ", "type": "semantic"}]
+
+    block = _format_memory_block(memories)
+
+    assert block == ""
