@@ -117,14 +117,29 @@ def test_format_memory_block_separates_sections_by_type():
     memories = [
         {"id": "mem-1", "content": "Prefiere respuestas en español", "type": "episodic"},
         {"id": "mem-2", "content": "Se llama Pablo y es ingeniero", "type": "semantic"},
+        {"id": "mem-3", "content": "Quiere respuestas en listas cortas", "type": "procedural"},
+        {"id": "mem-4", "content": "Mensaje sin type reconocido", "type": "unknown"},
+        {"id": "mem-5", "content": "Mensaje sin campo type"},
     ]
 
     block = _format_memory_block(memories)
 
     assert "[HECHOS Y PREFERENCIAS DEL USUARIO]" in block
+    assert "[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]" in block
     assert "[MEMORIA DEL USUARIO]" in block
-    assert block.index("[HECHOS Y PREFERENCIAS DEL USUARIO]") < block.index("Se llama Pablo y es ingeniero")
-    assert block.index("[MEMORIA DEL USUARIO]") < block.index("Prefiere respuestas en español")
+
+    semantic_idx = block.index("[HECHOS Y PREFERENCIAS DEL USUARIO]")
+    procedural_idx = block.index("[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]")
+    episodic_idx = block.index("[MEMORIA DEL USUARIO]")
+    assert semantic_idx < procedural_idx < episodic_idx
+
+    assert semantic_idx < block.index("Se llama Pablo y es ingeniero")
+    assert procedural_idx < block.index("Quiere respuestas en listas cortas")
+    assert episodic_idx < block.index("Prefiere respuestas en español")
+    # tipo desconocido y ausente caen en el bucket episodic (mismo principio de
+    # robustez que el fallback del clasificador)
+    assert episodic_idx < block.index("Mensaje sin type reconocido")
+    assert episodic_idx < block.index("Mensaje sin campo type")
 
 
 def test_format_memory_block_omits_empty_semantic_section():
@@ -133,6 +148,7 @@ def test_format_memory_block_omits_empty_semantic_section():
     block = _format_memory_block(memories)
 
     assert "[HECHOS Y PREFERENCIAS DEL USUARIO]" not in block
+    assert "[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]" not in block
     assert "[MEMORIA DEL USUARIO]" in block
 
 
@@ -142,4 +158,13 @@ def test_format_memory_block_omits_empty_episodic_section():
     block = _format_memory_block(memories)
 
     assert "[MEMORIA DEL USUARIO]" not in block
+    assert "[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]" not in block
     assert "[HECHOS Y PREFERENCIAS DEL USUARIO]" in block
+
+
+def test_format_memory_block_omits_empty_procedural_section():
+    memories = [{"id": "mem-1", "content": "Se llama Pablo", "type": "semantic"}]
+
+    block = _format_memory_block(memories)
+
+    assert "[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]" not in block

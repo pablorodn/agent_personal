@@ -26,6 +26,16 @@ async def test_classify_memory_type_returns_semantic(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_classify_memory_type_returns_procedural(monkeypatch):
+    fake_model = _FakeModel("procedural")
+    monkeypatch.setattr("app.agent.memory_classifier.create_compaction_model", lambda: fake_model)
+
+    result = await classify_memory_type("Prefiero que me respondas con listas cortas y sin rodeos")
+
+    assert result == "procedural"
+
+
+@pytest.mark.anyio
 async def test_classify_memory_type_returns_episodic(monkeypatch):
     fake_model = _FakeModel("  Episodic  ")
     monkeypatch.setattr("app.agent.memory_classifier.create_compaction_model", lambda: fake_model)

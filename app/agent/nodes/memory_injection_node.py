@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 MEMORY_MATCH_COUNT = 8
 MEMORY_HEADER = "[MEMORIA DEL USUARIO]"
 SEMANTIC_HEADER = "[HECHOS Y PREFERENCIAS DEL USUARIO]"
+PROCEDURAL_HEADER = "[FORMA DE TRABAJO Y PROCEDIMIENTOS DEL USUARIO]"
 
 
 def _last_user_message_content(messages: list) -> str | None:
@@ -38,10 +39,14 @@ def _format_memory_section(header: str, memories: list[dict]) -> list[str]:
 
 def _format_memory_block(memories: list[dict]) -> str:
     semantic = [memory for memory in memories if memory.get("type") == "semantic"]
-    episodic = [memory for memory in memories if memory.get("type") != "semantic"]
+    procedural = [memory for memory in memories if memory.get("type") == "procedural"]
+    episodic = [
+        memory for memory in memories if memory.get("type") not in ("semantic", "procedural")
+    ]
 
     sections: list[str] = []
     sections.extend(_format_memory_section(SEMANTIC_HEADER, semantic))
+    sections.extend(_format_memory_section(PROCEDURAL_HEADER, procedural))
     sections.extend(_format_memory_section(MEMORY_HEADER, episodic))
     return "\n".join(sections)
 
