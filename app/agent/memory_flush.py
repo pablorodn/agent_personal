@@ -15,7 +15,10 @@ async def flush_session_memory(db: AsyncClient, user_id: str, session_id: str) -
         messages = await get_session_messages(db, session_id)
         if not messages:
             return
-        latest = (messages[-1].content or "").strip()
+        last_user_message = next((m for m in reversed(messages) if m.role == "user"), None)
+        if last_user_message is None:
+            return
+        latest = (last_user_message.content or "").strip()
         if not latest:
             return
         if not can_store_memory(latest):

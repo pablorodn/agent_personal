@@ -1,6 +1,7 @@
 import pytest
 
 from app.agent.memory_flush import flush_session_memory
+from app.db.queries.messages import AgentMessage
 from app.services.memory_policy import can_store_memory
 
 
@@ -48,3 +49,32 @@ async def test_flush_session_memory_handles_external_errors(monkeypatch):
     monkeypatch.setattr("app.agent.memory_flush.generate_embedding", _broken_embedding)
 
     await flush_session_memory(db=object(), user_id="user-1", session_id="session-1")
+
+
+@pytest.mark.anyio
+async def test_flush_session_memory_persists_user_content_not_assistant(monkeypatch):
+    calls: dict[str, object] = {}
+
+    async def _fake_messages(_db, _session_id):
+        return [
+            AgentMessage(id="msg-1", session_id="session-1", role="user", content="mensaje del usuario"),
+            AgentMessage(
+                id="msg-2", session_id="session-1", role="assistant", content="respuesta del asistente"
+            ),
+        ]
+
+    async def _fake_embedding(_text):
+        calls["embedding"] = _text
+        return [0.1]
+
+    async def _fake_save_memory(_db, **kwargs):
+        calls["save"] = kwargs
+
+    monkeypatch.setattr("app.agent.memory_flush.get_session_messages", _fake_messages)
+    monkeypatch.setattr("app.agent.memory_flush.generate_embedding", _fake_embedding)
+    monkeypatch.setattr("app.agent.memory_flush.save_memory", _fake_save_memory)
+
+    await flush_session_memory(db=object(), user_id="user-1", session_id="session-1")
+
+    assert calls["embedding"] == "mensaje del usuario"
+    assert calls["save"]["content"] == "mensaje del usuario"
