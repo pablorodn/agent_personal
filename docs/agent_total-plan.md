@@ -32,7 +32,7 @@ Checklist:
 
 - [x] Crear `migrations/00006_agent_total_scope.sql`: agregar columna `profiles.default_model` (`text`, nullable).
 - [x] `profiles.default_model` es texto libre sin `CHECK` constraint contra la lista curada de modelos (para no requerir migración nueva al ampliar la lista); la validación contra la lista vigente ocurre en capa de aplicación (ver Fase 10).
-- [x] Mantener intactas `telegram_accounts`, `telegram_link_codes`, `scheduled_tasks`, `scheduled_task_runs`.
+- [x] Mantener intactas `scheduled_tasks`, `scheduled_task_runs`.
 - [x] Documentar explícitamente que cualquier `DROP` es opcional futuro y requiere autorización explícita separada.
 
 Criterio de aceptación (tests):
@@ -78,9 +78,6 @@ Checklist:
   - `app/services/github_client.py`
   - `app/tools/bash_exec.py`
   - `schedule_task` (schemas/adapters/router cron/services relacionados)
-  - `app/routers/telegram.py`
-  - `app/services/telegram_bot.py`
-  - `app/db/queries/telegram.py`
   - `app/db/queries/scheduled_tasks.py`
 - [x] Reducir `app/tools/catalog.py` y `app/tools/adapters.py` a:
   - `get_user_preferences`
@@ -99,7 +96,7 @@ Criterio de aceptación (tests):
 - `ruff check .` en verde.
 - `mypy app/` en verde.
 - `pytest -q` en verde.
-- Cero referencias a `github`, `bash`, `telegram`, `schedule_task` en `app/`.
+- Cero referencias a `github`, `bash`, `schedule_task` en `app/`.
 - Decisión documentada de dependencia: `asyncpg` se evaluó y se mantiene en `pyproject.toml` por uso vigente en `scripts/check_connections.py` (fuera de `app/`, pero en alcance operativo del repo).
 - Antes de marcar esta fase como HECHO: agregar entrada correspondiente en `docs/agent_total-changelog.md` (bugs encontrados, discrepancias de spec si las hubo, resultado de `ruff check .`, `mypy app/`, `pytest -q`).
 

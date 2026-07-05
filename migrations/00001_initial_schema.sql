@@ -87,7 +87,7 @@ create policy "Users can manage own tool settings"
 create table public.agent_sessions (
   id                  uuid primary key default gen_random_uuid(),
   user_id             uuid not null references public.profiles(id) on delete cascade,
-  channel             text not null default 'web' check (channel in ('web', 'telegram')),
+  channel             text not null default 'web' check (channel in ('web')),
   status              text not null default 'active' check (status in ('active', 'closed')),
   budget_tokens_used  integer not null default 0,
   budget_tokens_limit integer not null default 100000,
@@ -153,38 +153,3 @@ create policy "Users can manage own tool calls"
         and s.user_id = auth.uid()
     )
   );
-
--- ============================================================
--- telegram_accounts
--- ============================================================
-create table public.telegram_accounts (
-  id               uuid primary key default gen_random_uuid(),
-  user_id          uuid not null references public.profiles(id) on delete cascade unique,
-  telegram_user_id bigint not null unique,
-  chat_id          bigint not null,
-  linked_at        timestamptz not null default now()
-);
-
-alter table public.telegram_accounts enable row level security;
-
-create policy "Users can manage own telegram account"
-  on public.telegram_accounts for all
-  using (auth.uid() = user_id);
-
--- ============================================================
--- telegram_link_codes (one-time codes for linking)
--- ============================================================
-create table public.telegram_link_codes (
-  id         uuid primary key default gen_random_uuid(),
-  user_id    uuid not null references public.profiles(id) on delete cascade,
-  code       text not null unique,
-  used       boolean not null default false,
-  expires_at timestamptz not null default (now() + interval '10 minutes'),
-  created_at timestamptz not null default now()
-);
-
-alter table public.telegram_link_codes enable row level security;
-
-create policy "Users can manage own link codes"
-  on public.telegram_link_codes for all
-  using (auth.uid() = user_id);

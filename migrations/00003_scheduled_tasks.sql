@@ -6,7 +6,7 @@ ALTER TABLE public.agent_sessions
 
 ALTER TABLE public.agent_sessions
   ADD CONSTRAINT agent_sessions_channel_check
-  CHECK (channel IN ('web', 'telegram', 'cron'));
+  CHECK (channel IN ('web', 'cron'));
 
 -- ============================================================
 -- scheduled_tasks
