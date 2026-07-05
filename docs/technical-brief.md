@@ -250,8 +250,12 @@ Objetivo:
 
 Estado real actual:
 
-- `create_langfuse_callback()` existe pero no se usa en el invoke del grafo.
-- `evals/run_faq_experiment.py` es stub y no invoca al agente real.
+- `augment_invoke_config()` (`app/agent/langfuse.py`) inyecta `create_langfuse_callback()` como
+  `callbacks` en el config del `app.ainvoke()` real del grafo, junto con la metadata
+  (`langfuse_user_id`, `langfuse_session_id`, `langfuse_tags`); se invoca desde `run_agent()`
+  en `app/agent/graph.py`.
+- `evals/run_faq_experiment.py` invoca al agente real (`run_agent()` vía `warmup_agent_runtime()`
+  + sesiones reales), no es un stub.
 
 ## 10) Nuevas capacidades objetivo
 
