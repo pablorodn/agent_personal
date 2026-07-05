@@ -289,3 +289,4 @@ el formato de bugs/tests de arriba.)
   - Final de fase: `ruff check .` OK, `mypy app/` OK (54 archivos), `pytest -q` OK (`99 passed`, +3 respecto del baseline por `tests/unit/test_mcp_extension.py`).
   - Tests de aceptación: `tests/unit/test_mcp_extension.py` (`test_mcp_example_tool_registered_in_catalog`, `test_mcp_example_handler_returns_stub_response`, `test_mcp_example_tool_executes_via_generic_tool_executor_node`).
 - Fase NO marcada como HECHO por instrucción explícita del usuario; queda en estado `EN PROGRESO` en `docs/agent_total-plan.md` con el checklist tildado. Sin commitear por instrucción explícita del usuario (cierre pendiente de confirmación separada, para no repetir el problema de la sesión anterior de un cierre de fase mezclado sin confirmar).
+- Confirmación explícita del usuario en el chat de planificación (no solo durante la sesión de implementación) sobre las 4 respuestas de alcance; fase cierra sin discrepancias pendientes.

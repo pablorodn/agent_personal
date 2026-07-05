@@ -263,7 +263,7 @@ Criterio de aceptación:
 
 ## Fase 12 - Punto de extensión MCP
 
-Estado: EN PROGRESO (checklist implementado, no cerrada como HECHO — ver `docs/agent_total-changelog.md`)
+Estado: HECHO
 
 Checklist:
 
