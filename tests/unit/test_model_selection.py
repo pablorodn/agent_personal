@@ -49,7 +49,7 @@ async def test_ainvoke_chat_with_fallback_propagates_chosen_model_to_create_chat
         async def ainvoke(self, _messages):
             return AIMessage(content="ok")
 
-    def _fake_create_chat_model(model_name: str = PRIMARY_CHAT_MODEL):
+    def _fake_create_chat_model(model_name: str = PRIMARY_CHAT_MODEL, tool_schemas=None):
         requested_models.append(model_name)
         return _FakeChat()
 
@@ -73,7 +73,7 @@ async def test_ainvoke_chat_with_fallback_uses_other_curated_model_on_primary_fa
         async def ainvoke(self, _messages):
             return AIMessage(content="fallback-ok")
 
-    def _fake_create_chat_model(model_name: str = PRIMARY_CHAT_MODEL):
+    def _fake_create_chat_model(model_name: str = PRIMARY_CHAT_MODEL, tool_schemas=None):
         requested_models.append(model_name)
         return _FailingChat() if model_name == FALLBACK_CHAT_MODEL else _WorkingChat()
 
@@ -89,7 +89,9 @@ async def test_ainvoke_chat_with_fallback_uses_other_curated_model_on_primary_fa
 async def test_agent_node_propagates_state_chat_model_to_llm_call(monkeypatch):
     captured: dict[str, object] = {}
 
-    async def _fake_ainvoke_chat_with_fallback(messages, primary_model=PRIMARY_CHAT_MODEL):
+    async def _fake_ainvoke_chat_with_fallback(
+        messages, primary_model=PRIMARY_CHAT_MODEL, tool_schemas=None
+    ):
         captured["messages"] = messages
         captured["primary_model"] = primary_model
         return AIMessage(content="respuesta")
@@ -103,8 +105,9 @@ async def test_agent_node_propagates_state_chat_model_to_llm_call(monkeypatch):
         "system_prompt": "Eres un asistente.",
         "chat_model": FALLBACK_CHAT_MODEL,
     }
+    config = {"configurable": {"tool_ctx": {"enabled_tools": []}}}
 
-    result = await agent_node(state)
+    result = await agent_node(state, config)
 
     assert captured["primary_model"] == FALLBACK_CHAT_MODEL
     assert result["messages"][0].content == "respuesta"
@@ -114,7 +117,9 @@ async def test_agent_node_propagates_state_chat_model_to_llm_call(monkeypatch):
 async def test_agent_node_defaults_to_primary_model_when_state_missing_chat_model(monkeypatch):
     captured: dict[str, object] = {}
 
-    async def _fake_ainvoke_chat_with_fallback(messages, primary_model=PRIMARY_CHAT_MODEL):
+    async def _fake_ainvoke_chat_with_fallback(
+        messages, primary_model=PRIMARY_CHAT_MODEL, tool_schemas=None
+    ):
         captured["primary_model"] = primary_model
         return AIMessage(content="respuesta")
 
@@ -123,7 +128,8 @@ async def test_agent_node_defaults_to_primary_model_when_state_missing_chat_mode
     )
 
     state = {"messages": [], "system_prompt": "Eres un asistente."}
+    config = {"configurable": {"tool_ctx": {"enabled_tools": []}}}
 
-    await agent_node(state)
+    await agent_node(state, config)
 
     assert captured["primary_model"] == PRIMARY_CHAT_MODEL

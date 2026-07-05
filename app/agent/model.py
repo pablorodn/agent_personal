@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from langchain_core.messages import AIMessage
+from langchain_core.runnables import Runnable
 from langchain_openai import ChatOpenAI
 
 from app.config import get_settings
@@ -36,9 +37,11 @@ def validate_model_selection(requested_model: str | None, *, user_id: str) -> st
     return PRIMARY_CHAT_MODEL
 
 
-def create_chat_model(model_name: str = PRIMARY_CHAT_MODEL) -> ChatOpenAI:
+def create_chat_model(
+    model_name: str = PRIMARY_CHAT_MODEL, tool_schemas: list[dict[str, Any]] | None = None
+) -> Runnable:
     settings = get_settings()
-    return ChatOpenAI(
+    model = ChatOpenAI(
         model=model_name,
         temperature=0.2,
         max_tokens=1000,
@@ -48,6 +51,9 @@ def create_chat_model(model_name: str = PRIMARY_CHAT_MODEL) -> ChatOpenAI:
         openai_api_base=OPENROUTER_BASE_URL,
         default_headers={"HTTP-Referer": "https://agents.local"},
     )  # type: ignore[call-arg]
+    if tool_schemas:
+        return model.bind_tools(tool_schemas)
+    return model
 
 
 def create_compaction_model() -> ChatOpenAI:
@@ -62,10 +68,12 @@ def create_compaction_model() -> ChatOpenAI:
 
 
 async def ainvoke_chat_with_fallback(
-    messages: Sequence[Any], primary_model: str = PRIMARY_CHAT_MODEL
+    messages: Sequence[Any],
+    primary_model: str = PRIMARY_CHAT_MODEL,
+    tool_schemas: list[dict[str, Any]] | None = None,
 ) -> AIMessage:
     fallback_model = FALLBACK_CHAT_MODEL if primary_model != FALLBACK_CHAT_MODEL else PRIMARY_CHAT_MODEL
-    primary = create_chat_model(primary_model)
+    primary = create_chat_model(primary_model, tool_schemas)
     try:
         result = await asyncio.wait_for(primary.ainvoke(messages), timeout=CHAT_TIMEOUT_SECONDS)
         if isinstance(result, AIMessage):
@@ -82,7 +90,7 @@ async def ainvoke_chat_with_fallback(
             },
         )
 
-    fallback = create_chat_model(fallback_model)
+    fallback = create_chat_model(fallback_model, tool_schemas)
     result = await fallback.ainvoke(messages)
     if isinstance(result, AIMessage):
         return result

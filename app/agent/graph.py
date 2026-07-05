@@ -20,6 +20,7 @@ from app.db.queries.tool_calls import find_or_create_pending_tool_call, update_t
 from app.services.hitl import build_confirmation_message, sanitize_args
 from app.tools.adapters import TOOL_HANDLERS
 from app.tools.catalog import get_tool_risk, tool_requires_confirmation
+from app.tools.schemas import build_tool_schemas
 from app.tools.with_tracking import run_with_tracking
 
 MAX_TOOL_ITERATIONS = 6
@@ -88,12 +89,17 @@ def parse_pending_confirmation(final_state: dict[str, Any]) -> PendingConfirmati
     )
 
 
-async def agent_node(state: AgentState) -> dict[str, list[AIMessage]]:
+async def agent_node(state: AgentState, config: RunnableConfig) -> dict[str, list[AIMessage]]:
     current_date = datetime.now(ZoneInfo("America/Bogota")).strftime("%A, %d de %B de %Y, %H:%M")
     system_prompt = f"{state['system_prompt']}\n\nFecha y hora actual: {current_date} (hora Colombia)."
     chat_model = state.get("chat_model") or PRIMARY_CHAT_MODEL
+    tool_ctx = config.get("configurable", {}).get("tool_ctx", {})
+    enabled_tools = tool_ctx.get("enabled_tools") or []
+    tool_schemas = build_tool_schemas(enabled_tools)
     response = await ainvoke_chat_with_fallback(
-        [SystemMessage(content=system_prompt), *state["messages"]], primary_model=chat_model
+        [SystemMessage(content=system_prompt), *state["messages"]],
+        primary_model=chat_model,
+        tool_schemas=tool_schemas,
     )
     return {"messages": [response]}
 
@@ -125,7 +131,7 @@ async def tool_executor_node(state: AgentState, config: RunnableConfig) -> dict[
         if tool_id not in TOOL_HANDLERS:
             results.append(ToolMessage(content=json.dumps({"error": f"Unknown tool: {tool_id}"}), tool_call_id=model_tc_id))
             continue
-        if tool_ctx.get("enabled_tools") and tool_id not in tool_ctx["enabled_tools"]:
+        if tool_id not in (tool_ctx.get("enabled_tools") or []):
             results.append(
                 ToolMessage(
                     content=json.dumps({"error": f"Tool not enabled: {tool_id}"}),
