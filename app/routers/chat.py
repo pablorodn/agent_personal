@@ -12,6 +12,7 @@ from supabase import AsyncClient
 from app.agent.graph import AgentInput, run_agent
 from app.agent.memory_flush import flush_session_memory
 from app.agent.model import validate_model_selection
+from app.agent.session_title import generate_session_title
 from app.db.queries.messages import add_message
 from app.db.queries.profiles import get_profile, upsert_profile
 from app.db.queries.sessions import get_session_by_id
@@ -192,6 +193,8 @@ async def chat(
     )
     if not result.pending_confirmation:
         asyncio.create_task(flush_session_memory(db=db, user_id=user_id, session_id=session_id))
+        if session.title is None:
+            asyncio.create_task(generate_session_title(db=db, session_id=session_id))
     logger.info(
         "Chat message processed.",
         extra={
@@ -328,6 +331,8 @@ async def chat_stream(
         )
         if not result.pending_confirmation:
             asyncio.create_task(flush_session_memory(db=db, user_id=user_id, session_id=session_id))
+            if session.title is None:
+                asyncio.create_task(generate_session_title(db=db, session_id=session_id))
 
         html = templates.get_template("partials/message.html").render({"request": request, "msg": msg})
         total_ms = round((time.perf_counter() - total_start) * 1000, 2)

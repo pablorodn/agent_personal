@@ -328,6 +328,15 @@
     enhanceAssistantMessages(event.target);
   });
 
+  function toggleSessionMenu(id) {
+    const menu = document.getElementById("session-menu-" + id);
+    if (!menu) return;
+    document.querySelectorAll('[id^="session-menu-"]').forEach((el) => {
+      if (el !== menu) el.classList.add("hidden");
+    });
+    menu.classList.toggle("hidden");
+  }
+
   function appendAssistantError(message) {
     const messages = document.getElementById("messages");
     const container = document.getElementById("messages-container");

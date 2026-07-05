@@ -22,7 +22,7 @@ def test_chat_propagates_valid_selected_model_to_agent_input(
         return "user-1"
 
     async def _fake_session(_db, _session_id):
-        return SimpleNamespace(id="session-1", user_id="user-1")
+        return SimpleNamespace(id="session-1", user_id="user-1", title=None)
 
     async def _fake_add_message(_db, _session_id, role, content, structured_payload=None):
         _ = structured_payload
@@ -81,7 +81,7 @@ def test_chat_rejects_unknown_model_and_falls_back_to_primary(
         return "user-1"
 
     async def _fake_session(_db, _session_id):
-        return SimpleNamespace(id="session-1", user_id="user-1")
+        return SimpleNamespace(id="session-1", user_id="user-1", title=None)
 
     async def _fake_add_message(_db, _session_id, role, content, structured_payload=None):
         _ = structured_payload

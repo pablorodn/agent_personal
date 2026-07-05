@@ -38,7 +38,7 @@ def test_chat_accepts_valid_payload_without_422(monkeypatch, patch_auth_middlewa
         return "user-1"
 
     async def _fake_session(_db, _session_id):
-        return SimpleNamespace(id="session-1", user_id="user-1")
+        return SimpleNamespace(id="session-1", user_id="user-1", title=None)
 
     async def _fake_add_message(_db, _session_id, role, content, structured_payload=None):
         _ = structured_payload

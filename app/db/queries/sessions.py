@@ -10,6 +10,7 @@ class AgentSession(BaseModel):
     channel: str
     status: str
     last_used_at: str | None = None
+    title: str | None = None
 
 
 async def list_sessions(db: AsyncClient, user_id: str, channel: str = "web") -> list[AgentSession]:
@@ -20,6 +21,7 @@ async def list_sessions(db: AsyncClient, user_id: str, channel: str = "web") -> 
         .eq("channel", channel)
         .eq("status", "active")
         .order("last_used_at", desc=True)
+        .limit(10)
         .execute()
     )
     return [AgentSession(**row) for row in result.data]
@@ -77,3 +79,22 @@ async def get_session_by_id(db: AsyncClient, session_id: str) -> AgentSession | 
     if not result.data:
         return None
     return AgentSession(**result.data[0])
+
+
+async def update_session_title(db: AsyncClient, session_id: str, title: str) -> bool:
+    result = (
+        await db.table("agent_sessions")
+        .update({"title": title})
+        .eq("id", session_id)
+        .is_("title", "null")
+        .execute()
+    )
+    return bool(result.data)
+
+
+async def archive_session(db: AsyncClient, session_id: str) -> None:
+    await db.table("agent_sessions").update({"status": "archived"}).eq("id", session_id).execute()
+
+
+async def delete_session(db: AsyncClient, session_id: str) -> None:
+    await db.table("agent_sessions").delete().eq("id", session_id).execute()
