@@ -50,18 +50,22 @@ def test_delete_session_owned_by_another_user_returns_403(monkeypatch, patch_aut
     app.dependency_overrides.clear()
 
 
-def test_archive_current_session_creates_new_session_and_redirects(
+def test_archive_current_session_does_not_create_new_session_and_redirects(
     monkeypatch, patch_auth_middleware, auth_cookie
 ):
+    # Desde ef4b7fb, archive_session_route ya no crea una sesión de respaldo explícita:
+    # solo archiva y redirige a /chat. get_or_create_active_session (invocado por
+    # GET /chat en app/pages/chat.py, no por esta ruta) es quien resuelve el fallback
+    # -sesión existente más reciente, o una nueva solo si no queda ninguna- del lado
+    # del cliente al seguir el HX-Redirect.
     _install_common_fakes(monkeypatch)
     calls: dict[str, object] = {}
 
     async def _fake_archive_session(_db, session_id):
         calls["archived"] = session_id
 
-    async def _fake_create_session(_db, user_id, channel="web"):
-        calls["created_for"] = user_id
-        return SimpleNamespace(id="new-session")
+    async def _fake_create_session(_db, _user_id, channel="web"):
+        raise AssertionError("archive_session_route no debe crear una sesión nueva")
 
     monkeypatch.setattr("app.routers.sessions.archive_session", _fake_archive_session)
     monkeypatch.setattr("app.routers.sessions.create_session", _fake_create_session)
@@ -75,7 +79,6 @@ def test_archive_current_session_creates_new_session_and_redirects(
     assert response.status_code == 200
     assert response.headers["hx-redirect"] == "/chat"
     assert calls["archived"] == "session-1"
-    assert calls["created_for"] == "user-1"
     app.dependency_overrides.clear()
 
 
@@ -107,9 +110,13 @@ def test_archive_non_current_session_returns_empty_partial_without_redirect(
     app.dependency_overrides.clear()
 
 
-def test_delete_current_session_cleans_checkpointer_creates_session_and_redirects(
+def test_delete_current_session_cleans_checkpointer_and_redirects_without_creating_session(
     monkeypatch, patch_auth_middleware, auth_cookie
 ):
+    # Desde ef4b7fb, delete_session_route ya no crea una sesión de respaldo explícita:
+    # solo limpia el checkpointer, hace el hard-delete y redirige a /chat. Igual que en
+    # archive, get_or_create_active_session (invocado por GET /chat, no por esta ruta)
+    # es quien resuelve el fallback del lado del cliente al seguir el HX-Redirect.
     _install_common_fakes(monkeypatch)
     calls: list[str] = []
 
@@ -124,8 +131,7 @@ def test_delete_current_session_cleans_checkpointer_creates_session_and_redirect
         calls.append(f"agent_sessions:{session_id}")
 
     async def _fake_create_session(_db, _user_id, channel="web"):
-        calls.append("create_session")
-        return SimpleNamespace(id="new-session")
+        raise AssertionError("delete_session_route no debe crear una sesión nueva")
 
     monkeypatch.setattr("app.routers.sessions.get_checkpointer", _fake_get_checkpointer)
     monkeypatch.setattr("app.routers.sessions.delete_session", _fake_delete_session)
@@ -140,7 +146,7 @@ def test_delete_current_session_cleans_checkpointer_creates_session_and_redirect
     assert response.status_code == 200
     assert response.headers["hx-redirect"] == "/chat"
     # El checkpointer se limpia antes del hard-delete de agent_sessions.
-    assert calls == ["checkpointer:session-1", "agent_sessions:session-1", "create_session"]
+    assert calls == ["checkpointer:session-1", "agent_sessions:session-1"]
     app.dependency_overrides.clear()
 
 

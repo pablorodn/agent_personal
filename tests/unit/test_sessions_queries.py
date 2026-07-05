@@ -51,7 +51,10 @@ async def test_list_sessions_orders_desc_and_limits_to_10():
     assert call_names == ["table", "select", "eq", "eq", "eq", "order", "limit"]
 
     order_call = next(c for c in db.calls if c[0] == "order")
-    assert order_call[1] == ("last_used_at",)
+    # Ordena por created_at (no last_used_at) a propósito desde ef4b7fb: así la posición
+    # de cada sesión en el sidebar no salta cada vez que se envía un mensaje y se actualiza
+    # last_used_at vía touch_session.
+    assert order_call[1] == ("created_at",)
     assert order_call[2] == {"desc": True}
 
     limit_call = next(c for c in db.calls if c[0] == "limit")
