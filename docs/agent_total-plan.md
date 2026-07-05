@@ -281,23 +281,23 @@ Criterio de aceptación (tests):
 
 ## Fase 13 - Sesiones: título automático, archivar y eliminar
 
-Estado: PENDIENTE
+Estado: HECHO
 
 Checklist:
 
-- [ ] Crear `migrations/00007_sessions_title_and_archive.sql` (migración nueva e independiente): agregar columna `agent_sessions.title` (`text`, nullable, default null); extender el CHECK de `agent_sessions.status` de `('active','closed')` a `('active','archived','closed')` siguiendo el patrón `DROP CONSTRAINT IF EXISTS agent_sessions_status_check` / `ADD CONSTRAINT` ya usado en `migrations/00003`.
-- [ ] `db/queries/sessions.py`: `list_sessions()` agrega `.limit(10)` además del `.order("last_used_at", desc=True)` y `.eq("status","active")`.
-- [ ] Nueva función de título: generar título corto (máx. 6 palabras, sin comillas ni punto final) usando `create_compaction_model()` (no el modelo principal de chat), a partir del primer mensaje de usuario de la sesión.
-- [ ] Trigger: tras cualquier turno completado sin confirmación pendiente (mismo punto donde hoy se dispara `flush_session_memory` vía `asyncio.create_task`), si `agent_sessions.title IS NULL`, disparar generación de título en background (fire-and-forget, no bloquea respuesta). Debe poder reintentarse en turnos siguientes si falla (condición de disparo: `title IS NULL`).
-- [ ] Persistencia: `UPDATE agent_sessions SET title = ... WHERE id = session_id AND title IS NULL` (guard de idempotencia ante condición de carrera).
-- [ ] Manejo de fallos: mismo patrón que `memory_flush.py` (`try/except`, warning log, nunca rompe el turno). Mientras no haya título, la UI mantiene fallback por fecha (`format_session_date`).
-- [ ] Nuevas rutas: `POST /api/sessions/{id}/archive` y `POST /api/sessions/{id}/delete`.
+- [x] Crear `migrations/00007_sessions_title_and_archive.sql` (migración nueva e independiente): agregar columna `agent_sessions.title` (`text`, nullable, default null); extender el CHECK de `agent_sessions.status` de `('active','closed')` a `('active','archived','closed')` siguiendo el patrón `DROP CONSTRAINT IF EXISTS agent_sessions_status_check` / `ADD CONSTRAINT` ya usado en `migrations/00003`.
+- [x] `db/queries/sessions.py`: `list_sessions()` agrega `.limit(10)` además del `.order("last_used_at", desc=True)` y `.eq("status","active")`.
+- [x] Nueva función de título: generar título corto (máx. 6 palabras, sin comillas ni punto final) usando `create_compaction_model()` (no el modelo principal de chat), a partir del primer mensaje de usuario de la sesión.
+- [x] Trigger: tras cualquier turno completado sin confirmación pendiente (mismo punto donde hoy se dispara `flush_session_memory` vía `asyncio.create_task`), si `agent_sessions.title IS NULL`, disparar generación de título en background (fire-and-forget, no bloquea respuesta). Debe poder reintentarse en turnos siguientes si falla (condición de disparo: `title IS NULL`).
+- [x] Persistencia: `UPDATE agent_sessions SET title = ... WHERE id = session_id AND title IS NULL` (guard de idempotencia ante condición de carrera).
+- [x] Manejo de fallos: mismo patrón que `memory_flush.py` (`try/except`, warning log, nunca rompe el turno). Mientras no haya título, la UI mantiene fallback por fecha (`format_session_date`).
+- [x] Nuevas rutas: `POST /api/sessions/{id}/archive` y `POST /api/sessions/{id}/delete`.
   - `archive`: valida ownership, `UPDATE status='archived'`. Si `session_id` coincide con `current_session_id` del request, crea sesión nueva vacía y responde `HX-Redirect: /chat`; si no coincide, responde partial vacío para remover item.
   - `delete`: valida ownership, hard-delete real (`DELETE FROM agent_sessions WHERE id=...`; cascada vía `ON DELETE CASCADE` de `migrations/00001` para `agent_messages` y `tool_calls`). Si es sesión actual: crea sesión nueva + `HX-Redirect: /chat`; si no: partial vacío para remover item.
-- [ ] Confirmación en UI: botón "Eliminar" usa `hx-confirm` con mensaje claro; botón "Archivar" no requiere confirmación.
-- [ ] Menú de 3 puntos: función JS inline `toggleSessionMenu(id)` en `chat.html`, sin click-outside-to-close en esta fase (limitación aceptada y documentada).
-- [ ] Al ejecutar hard-delete de una sesión en `POST /api/sessions/{id}/delete`, además de `DELETE FROM agent_sessions`, eliminar el estado del checkpointer de LangGraph asociado a ese `thread_id` (`session_id`) para que no quede historial recuperable en tablas internas de `AsyncPostgresSaver`. Verificar en implementación si la versión instalada de `langgraph-checkpoint-postgres` expone método de borrado de hilo (`adelete_thread` o equivalente); si no existe API, documentar ausencia y hacer `DELETE` manual sobre tablas de checkpoint filtrando por `thread_id`, en la misma operación lógica. Best-effort: si falla limpieza del checkpointer, no bloquear borrado de `agent_sessions`; sí registrar warning.
-- [ ] Fuera de alcance de esta fase: no construir pantalla de archivados ni recuperación; archivar solo oculta de sidebar y deja `status='archived'` en base.
+- [x] Confirmación en UI: botón "Eliminar" usa `hx-confirm` con mensaje claro; botón "Archivar" no requiere confirmación.
+- [x] Menú de 3 puntos: función JS inline `toggleSessionMenu(id)` en `chat.html`, sin click-outside-to-close en esta fase (limitación aceptada y documentada).
+- [x] Al ejecutar hard-delete de una sesión en `POST /api/sessions/{id}/delete`, además de `DELETE FROM agent_sessions`, eliminar el estado del checkpointer de LangGraph asociado a ese `thread_id` (`session_id`) para que no quede historial recuperable en tablas internas de `AsyncPostgresSaver`. Verificar en implementación si la versión instalada de `langgraph-checkpoint-postgres` expone método de borrado de hilo (`adelete_thread` o equivalente); si no existe API, documentar ausencia y hacer `DELETE` manual sobre tablas de checkpoint filtrando por `thread_id`, en la misma operación lógica. Best-effort: si falla limpieza del checkpointer, no bloquear borrado de `agent_sessions`; sí registrar warning.
+- [x] Fuera de alcance de esta fase: no construir pantalla de archivados ni recuperación; archivar solo oculta de sidebar y deja `status='archived'` en base.
 
 Criterio de aceptación (tests):
 
