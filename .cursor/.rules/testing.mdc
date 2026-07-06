@@ -25,10 +25,10 @@ def test_high_risk_tool_requires_confirmation():
     assert tool_requires_confirmation("edit_file") is True
 ```
 
-## Matriz minima por feature
+## Matriz mínima por área funcional
 
-- Auth: login, signup, logout, callback y sesión expirada.
+- Auth: login, signup, logout y sesión expirada.
 - Chat: creación de sesión, envío de mensaje, historial y limpieza.
 - HITL: pending, approve, reject, failed y reanudación tras refresh.
 - Tools: política de riesgo, feature flags fail-closed, ownership checks.
-- Memoria: extracción, deduplicación, búsqueda vectorial, filtros de privacidad.
+- Memoria: extracción, clasificación por tipo (`episodic`/`semantic`/`procedural`), búsqueda vectorial, filtros de privacidad.

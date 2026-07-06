@@ -1,34 +1,34 @@
 # agent_total
 
-Plantilla de agente genérico y extensible sobre FastAPI + LangGraph + Supabase + OpenRouter + Langfuse, con UI SSR en Jinja2/HTMX.
+Plantilla de agente conversacional genérico y extensible sobre FastAPI + LangGraph + Supabase + OpenRouter + Langfuse, con UI SSR en Jinja2/HTMX.
 
-## Objetivo
+## Qué es esto
 
-`agent_total` prioriza un runtime sólido y reusable: grafo estable, políticas de riesgo, checkpointing, memoria, trazabilidad y una vía clara para extender herramientas sin reescribir el núcleo.
+`agent_total` es una base para construir agentes de chat con memoria de largo plazo, HITL (human-in-the-loop) para acciones riesgosas, y un punto de extensión de herramientas pensado para no tener que tocar el runtime del grafo cada vez que se agrega una integración nueva.
 
-## Estado actual del repositorio
+No resuelve un dominio específico: el objetivo es que cualquier desarrollo futuro — por ejemplo, conectar un servidor MCP a una base de datos externa para que el chat responda preguntas en lenguaje natural contra esa base — se agregue por catálogo + adapter, reusando el runtime, el checkpointing, la memoria y la trazabilidad ya construidos.
 
-- Existe implementación funcional de autenticación, onboarding de 4 pasos, chat web multi-sesión con sidebar y settings.
-- El runtime base de LangGraph está conectado como `memory_injection -> compaction -> agent -> tools`.
-- El mecanismo HITL con `interrupt()` y `Command(resume=...)` está presente y sigue siendo genérico para tools de riesgo `medium/high`.
-- Hay file tools con flag `FILE_TOOLS_ENABLED` y confinamiento de path.
-- Memoria de largo plazo, compactación de dos etapas con circuit breaker, Langfuse conectado al `invoke` real, y evaluaciones contra el runtime real están implementados y en `HECHO` (Fases 4-8).
-- Adjuntos multimodales, selector de modelo, punto de extensión MCP, gestión completa de sesiones (título automático, archivar, hard-delete con limpieza de checkpointer) y el hardening final de cierre también están en `HECHO` (Fases 9-14).
-- Las 15 fases del plan están cerradas. Ver `docs/agent_total-as-built.md` para el resumen consolidado de qué se construyó, qué quedó fuera de alcance a propósito, y la lección aprendida principal del proyecto.
+## Arquitectura en 4 líneas
 
-## Fuentes de verdad
+- **Runtime**: LangGraph con grafo `memory_injection -> compaction -> agent -> tools`, checkpointing en Postgres (`AsyncPostgresSaver`), HITL genérico vía `interrupt()`/`Command(resume=...)`.
+- **Tools**: catálogo + política de riesgo (`app/tools/catalog.py`) + handlers (`app/tools/adapters.py`); agregar una tool nueva no requiere tocar `app/agent/graph.py`.
+- **Memoria**: extracción y clasificación automática (`episodic`/`semantic`/`procedural`), inyección real en el prompt antes de cada turno, filtro de privacidad antes de persistir.
+- **UI**: SSR + HTMX (Jinja2), sin SPA; `POST /api/chat/stream` (SSE) es la ruta real que usa la UI de chat.
 
-| Tema | Fuente principal | Documentos asociados |
-| --- | --- | --- |
-| Arquitectura y runtime | `docs/technical-brief.md` | `.cursor/.rules/architecture.mdc`, `.cursor/.rules/guardrails.mdc` |
-| UI y comportamiento HTMX | `docs/ui-design.md` | Tabla de rutas de `docs/technical-brief.md` |
-| Modelo de datos | `migrations/*.sql` | Sección de datos en `docs/technical-brief.md` |
-| Seguridad y testing | `.cursor/.rules/*.mdc` | `docs/technical-brief.md`, `docs/ui-design.md` |
-| Plan de implementación por fases | `docs/agent_total-plan.md` | Estado operativo del proyecto |
-| Resumen as-built y lecciones aprendidas | `docs/agent_total-as-built.md` | `docs/agent_total-changelog.md` |
+Todo lo esencial de esta plantilla vive en archivos del repo (código + docs), no en memoria conversacional de ninguna sesión de asistente.
 
-## Pendientes reales de esta etapa
+## Documentación
 
-- Ninguno bloqueante: las 15 fases del plan (`docs/agent_total-plan.md`) están en `HECHO`.
-- Fuera de alcance a propósito (no pendiente, decisión consciente): pantalla de archivados/recuperación de sesiones, click-outside-to-close del menú de sesión, integración MCP real (solo scaffolding stub), renderizado de markdown general en mensajes (solo bloques de código), comportamiento ideal de `microcompact` con marcadores en vez de truncado duro. Detalle completo en `docs/agent_total-as-built.md`.
+| Documento | Qué describe |
+| --- | --- |
+| `docs/technical-brief.md` | Brief de producto: qué es `agent_total` y qué debe hacer |
+| `docs/ui-design.md` | Qué se espera de la UI (contrato visual y HTMX) |
+| `docs/implementation-summary.md` | Cómo está construido en la práctica (mecanismos internos) |
+| `docs/extending.md` | El plan que se ejecutó para implementar el brief, y cómo aplicarlo a extensiones nuevas |
+| `docs/mcp-extension-example.md` | Stub de referencia del punto de extensión MCP |
+| `migrations/*.sql` | Modelo de datos, fuente de verdad del esquema |
+| `.cursor/.rules/*.mdc` | Reglas de arquitectura, seguridad, testing y colaboración |
 
+`agent_total` es un producto completo y funcional; no hay trabajo pendiente en su alcance
+actual. Las decisiones de diseño sobre qué queda deliberadamente fuera de alcance están en
+`docs/implementation-summary.md`.

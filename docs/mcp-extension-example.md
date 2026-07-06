@@ -1,9 +1,10 @@
 # Ejemplo de referencia: registrar una tool de servidor MCP
 
-Este documento acompaña la Fase 12 del plan (`docs/agent_total-plan.md`) y
-muestra, con un ejemplo concreto y ejecutable, cómo `agent_total` permite
+Este documento muestra, con un ejemplo concreto y ejecutable, cómo `agent_total` permite
 registrar una tool nueva -- incluyendo una proveniente de un servidor MCP --
-sin modificar `app/agent/graph.py`.
+sin modificar `app/agent/graph.py`. Ver `docs/extending.md` para el checklist general de
+extensión y un ejemplo de diseño más cercano a un caso real (tool MCP contra una base de
+datos externa).
 
 ## Qué es y qué no es este ejemplo
 
@@ -13,7 +14,7 @@ sin modificar `app/agent/graph.py`.
   dependencia nueva (`mcp`, `langchain-mcp-adapters`, etc.) al proyecto. El
   handler de ejemplo simula la respuesta que devolvería un cliente MCP real.
 
-## Mecanismo genérico ya existente (sin cambios en esta fase)
+## Mecanismo genérico ya existente
 
 `app/agent/graph.py` no conoce los nombres de las tools: `tool_executor_node`
 resuelve el handler a ejecutar consultando dos únicos puntos de extensión:

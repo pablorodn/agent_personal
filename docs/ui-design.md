@@ -1,7 +1,6 @@
 # UI Design - agent_total (Jinja2 + HTMX)
 
-> Contrato visual y de comportamiento para la UI SSR/HTMX de `agent_total`.
-> Este documento refleja alcance real actual + objetivos de la etapa.
+> Contrato visual y de comportamiento vigente para la UI SSR/HTMX de `agent_total`.
 
 ## 1) Principios de UI
 
@@ -26,24 +25,19 @@ Estado real actual:
 - `chat` y `settings` navegan por links normales (`<a href>`).
 - `logout` usa `hx-post` y `HX-Redirect`.
 
-No se considera pendiente en esta etapa.
-
-## 4) Chat web: estado actual y objetivo
+## 4) Chat web
 
 ### Estado actual
 
 - Chat multi-sesión con sidebar disponible.
 - Flujo HTMX de envío y render de respuestas operativo.
 - Flujo de confirmación HITL en UI operativo.
+- Adjuntos multimodales en el formulario del chat.
+- Selector de modelo por usuario (vive en `/settings`, ver §7).
+- Botón copiar por mensaje del asistente.
+- Resaltado de sintaxis en bloques de código.
 
-### Objetivos de esta etapa
-
-1. Adjuntos multimodales en el formulario del chat.
-2. Selector de modelo por usuario.
-3. Botón copiar por mensaje del asistente.
-4. Resaltado de sintaxis en bloques de código.
-
-### Sidebar de sesiones (objetivo adicional)
+### Sidebar de sesiones
 
 - La lista de sesiones se muestra de más reciente a más antigua (`last_used_at desc`) con máximo 10 items.
 - Cada item de `partials/session_item.html` muestra `session.title` si existe; fallback a `format_session_date` cuando `title` es `null`.
@@ -53,8 +47,8 @@ No se considera pendiente en esta etapa.
 - Interacción del menú: JS mínimo inline en `chat.html`, sin librerías ni build step, siguiendo el patrón de `toggleSidebar()`/`scrollToBottom()`.
   - Botón de 3 puntos: `onclick="toggleSessionMenu('{{ session.id }}')"`.
   - Función `toggleSessionMenu(sessionId)`: alterna clase `hidden` sobre `id="session-menu-{{ session.id }}"`.
-- Limitación aceptada en esta fase: no se implementa cierre por click afuera (click-outside-to-close); queda como mejora futura.
-- En esta etapa no existe pantalla de archivados/papelera.
+- Limitación aceptada (decisión de diseño, ver `docs/implementation-summary.md`): no se implementa cierre por click afuera (click-outside-to-close).
+- No existe pantalla de archivados/papelera (ver `docs/implementation-summary.md`).
 
 ## 5) HTMX en chat (contrato)
 
@@ -70,9 +64,9 @@ No se considera pendiente en esta etapa.
 | Archivar sesión | `POST /api/sessions/{id}/archive` + `hx-vals` con `current_session_id` | `closest [data-session-item]` | `outerHTML` | `HX-Redirect: /chat` si era la sesión actual; si no, partial vacío que remueve item |
 | Eliminar sesión | `POST /api/sessions/{id}/delete` + `hx-vals` con `current_session_id` + `hx-confirm` | `closest [data-session-item]` | `outerHTML` | `HX-Redirect: /chat` si era la sesión actual; si no, partial vacío que remueve item |
 
-## 6) Adjuntos multimodales (objetivo de UI + HTMX)
+## 6) Adjuntos multimodales (UI + HTMX)
 
-Contrato objetivo de formulario:
+Contrato del formulario:
 
 - `input type="file"` con `accept="image/png,image/jpeg,image/webp,application/pdf"`.
 - `enctype="multipart/form-data"` en `#chat-form`.
@@ -85,7 +79,7 @@ Validaciones UX mínimas:
 - Mostrar error claro si excede tamaño.
 - Bloquear submit mientras se procesa.
 
-Límites de la etapa:
+Límites:
 
 - Imagen: hasta 5 MB.
 - PDF: hasta 10 MB.
@@ -103,23 +97,23 @@ Persistencia de contexto de adjuntos en historial:
 - Cuando un mensaje de usuario incluye adjuntos, backend guarda metadata no sensible en `agent_messages.structured_payload` (ej. `{type: "attachment_note", count: N, kinds: [...]}`) sin contenido del archivo.
 - `partials/message.html` debe renderizar un indicador genérico en historial (ej. `📎 Se enviaron N archivo(s)`) incluso tras recarga de sesión.
 
-## 7) Selector de modelo en chat (objetivo de UI)
+## 7) Selector de modelo (estado real)
 
-Componente objetivo:
+El selector vive únicamente en `/settings` (`app/templates/settings.html`); la barra de chat
+ya no tiene un `<select>` propio (se sacó del composer). El formulario de chat sigue
+enviando cada turno sin campo `chat_model`, y el backend resuelve contra
+`profiles.default_model` en ambas rutas de envío (`POST /api/chat` y `POST /api/chat/stream`).
 
-- Select visible en toolbar del chat.
-- Lista curada inicial fija:
+- Lista curada fija:
   - `google/gemini-2.5-flash`
   - `openai/gpt-4o-mini`
 - Esta lista es la única fuente de verdad del selector mientras no se amplíe en una sesión de documentación dedicada futura.
-- Opción por defecto leída desde `profiles.default_model` cuando exista.
-- Cambio aplica a mensajes nuevos y se puede persistir por usuario.
 
 Regla explícita:
 
 - El selector solo afecta `create_chat_model()`.
 - El modelo de compactación sigue fijo y no seleccionable por usuario.
-- El valor recibido desde formulario se valida server-side contra la lista curada; si no coincide, se ignora y se usa default con warning log (sin error duro al usuario).
+- Si algún caller igual manda `chat_model` (ej. un cliente distinto de la UI), el valor se valida server-side contra la lista curada; si no coincide, se ignora y se usa default con warning log (sin error duro al usuario).
 
 ## 8) Mejoras de render de mensajes
 
@@ -141,10 +135,10 @@ Estado real actual:
 - Onboarding de 4 pasos se mantiene completo en alcance.
 - Settings sigue como pantalla de configuración de perfil/agente/herramientas.
 
-No se planifica rediseño de flujo en esta etapa; solo ajustes necesarios para:
+No se planifica rediseño de flujo; los únicos ajustes vigentes son:
 
 - selector de modelo por defecto,
-- consistencia con catálogo de tools reducido.
+- consistencia con el catálogo de tools disponible.
 
 ## 10) Inventario de partials relevantes
 
@@ -154,31 +148,21 @@ No se planifica rediseño de flujo en esta etapa; solo ajustes necesarios para:
 - `partials/session_item.html`
 - `partials/settings_save_status.html`
 
-Nuevos partials esperados en esta etapa:
+Partials adicionales usados por estas capacidades (nombres reales u equivalentes):
 
 - `partials/chat_attachment_errors.html` (o equivalente)
-- `partials/model_selector.html` (o equivalente)
 - `partials/session_item_menu.html` (o equivalente para menú de 3 puntos Archivar/Eliminar)
 - `partials/message.html` debe soportar render de indicador `attachment_note` en mensajes de usuario con adjuntos.
 
-## 11) Sección HTMX para nuevas capacidades
+## 11) HTMX para adjuntos y selector de modelo
 
 | Acción nueva | Método + ruta | `hx-target` | `hx-swap` | Resultado esperado |
 | --- | --- | --- | --- | --- |
 | Enviar chat con adjuntos (UI real, no HTMX) | `POST /api/chat/stream` vía `fetch` (SSE) | `#messages` (insertado manualmente) | — | Mensaje enviado con contenido multimodal |
 | Guardar modelo preferido | `POST /settings` (o endpoint dedicado) | `#save-status` | `innerHTML` | Confirmación de guardado |
 
-## 12) Pendientes reales de esta etapa
+## 12) Alcance de UI
 
-Se reemplaza la lista antigua de "pendientes de conexión" por estos pendientes actuales:
-
-- Implementar inyección real de memoria en prompt (hoy `memory_injection_node` es no-op).
-- Conectar recuperación vectorial real (`match_memories`) con parámetro correcto.
-- Completar compactación etapa 2 con LLM y circuit breaker.
-- Conectar callback Langfuse al invoke del runtime.
-- Reescribir evaluaciones para usar runtime real.
-- Incorporar adjuntos multimodales en chat.
-- Incorporar selector de modelo con persistencia en `profiles.default_model`.
-- Añadir botón copiar y resaltado de código en mensajes.
-
-El desglose operativo por fases vive en `docs/agent_total-plan.md`.
+La UI descrita en este documento está completa y funcional. Las decisiones de diseño sobre
+qué queda deliberadamente fuera de alcance están en `docs/implementation-summary.md`. Para
+agregar una capacidad nueva de UI/HTMX, ver `docs/extending.md`.

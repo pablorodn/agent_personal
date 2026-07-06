@@ -1,51 +1,44 @@
 ---
-description: Agente de implementación — la documentación es inmutable durante la implementación
+description: Como colaborar implementando extensiones nuevas sobre agent_total
 alwaysApply: true
 ---
 
-# Agente de Implementación — agent_total (Python)
+# Colaboración de implementación — agent_total (Python)
 
-## Tu rol
-Eres un agente de implementación. Tu único trabajo es ESCRIBIR CÓDIGO que materialice la
-especificación ya existente. La fase de diseño está CERRADA.
+## Rol
 
-## Regla inviolable #1 — Documentación de SOLO LECTURA
-NO edites, renombres, muevas, reformatees ni borres, bajo ninguna circunstancia:
-- `README.md`
-- `docs/` (todo)
-- `.cursor/.rules/` (todas las `.mdc`)
-- `migrations/` (todas, incluidas `00001`–`00005`)
+`agent_total` es una plantilla base pensada para crecer con integraciones nuevas (tools, MCP,
+etc.) sin reescribir el runtime del grafo. Al implementar una extensión, seguir el contrato ya
+documentado en `docs/technical-brief.md` y el procedimiento de `docs/extending.md`.
 
-Son LA FUENTE DE VERDAD. El código se adapta a ellos, nunca al revés. Si tu implementación
-no encaja con lo documentado, el error está en tu código.
+## Documentación como fuente de verdad
 
-## Regla inviolable #2 — Ante conflicto, detente y pregunta
-Si la spec es ambigua, contradictoria, incompleta o inviable: DETENTE, cita archivo y sección,
-propón opciones y ESPERA decisión explícita. Una petición de implementar NO autoriza tocar
-documentación. Solo cambias un doc tras instrucción inequívoca del usuario.
+`README.md`, `docs/`, `.cursor/.rules/` y las migraciones ya aplicadas (`migrations/*.sql`)
+reflejan el estado real del código. Si una implementación no encaja con lo documentado,
+evaluar primero si el error está en el código antes de asumir que el doc quedó desactualizado.
+Si genuinamente hace falta actualizar un doc (cambio de arquitectura, contrato nuevo, decisión
+de alcance), señalar qué archivo/sección cambia y por qué en vez de editarlo en silencio.
 
-Nota para `agent_total`: cuando el candado de `.cursor/.rules/change-control.mdc` esté activo,
-esa regla tiene precedencia y suspende la excepción de "instrucción inequívoca del usuario" durante
-sesiones de implementación de fases.
+## Ante ambigüedad, detenerse y preguntar
 
-## Qué SÍ debes crear
-Artefactos pendientes del README/brief: estructura `app/` completa, `pyproject.toml`,
-`.env.example` (derivados de §5 y §11), `evals/` y tests conforme a `testing.mdc`.
+Si la spec es ambigua, contradictoria o inviable: detenerse, citar archivo y sección, proponer
+opciones y esperar decisión explícita en vez de asumir.
 
-## Contrato de fidelidad
-- Grafo canónico: `memory_injection → compaction → agent → tools`.
-- Tabla de rutas (brief) y tabla HTMX (`ui-design.md`) al pie de la letra: método, ruta,
-  `hx-target`, `hx-swap`, partials.
-- Catálogo de tools y riesgo en código, nunca en el prompt.
+## Contrato a respetar al extender
+
+- Grafo canónico: `memory_injection → compaction → agent → tools` (no bifurcar lógica por
+  canal ni por dominio dentro del grafo, ver `architecture.mdc`).
+- Catálogo de tools y política de riesgo en código (`app/tools/catalog.py`), nunca hardcodeado
+  en el prompt.
 - HITL: `interrupt()` + `Command(resume=...)`, los dos IDs (`tool_calls.id` vs
   `model_tool_call_id`), estado que sobrevive a refresh.
-- Nombres EXACTOS de env vars (brief §11). Esquema de migraciones sin inventar columnas/tablas.
-- Feature flags fail-closed y confinamiento de path.
+- Nombres de env vars siguiendo el patrón ya documentado en `docs/technical-brief.md` §7.
+- No modificar migraciones ya mergeadas; agregar nuevas migraciones incrementales
+  (`migrations/000N_*.sql`).
+- Feature flags fail-closed y confinamiento de path (ver `security.mdc`).
 
-## Antes de cada cambio
-Declara en una línea: (1) qué archivo tocas, (2) qué sección lo justifica. Si cae en rutas
-de SOLO LECTURA, ABORTA y avisa.
+## Antes de cerrar un cambio
 
-## Al cerrar
-Confirma que no tocaste `docs/`, `migrations/`, `.cursor/.rules/` ni `README.md`, y corre
-`ruff check .`, `mypy app/` y los tests relevantes.
+Correr `ruff check .`, `mypy app/` y los tests relevantes (`testing.mdc`). Si se tocó
+documentación, confirmar que no quedaron referencias a código, rutas o tools que ya no
+existen.
