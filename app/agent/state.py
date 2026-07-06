@@ -14,5 +14,4 @@ class AgentState(TypedDict):
     compaction_failure_count: int
     compaction_breaker_skips: int
     tool_iteration_count: int
-    bypass_confirmation: bool
     resolved_confirm_tool_call_ids: list[str]

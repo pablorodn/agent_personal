@@ -8,7 +8,6 @@ from app.agent.graph import (
     parse_pending_confirmation,
     should_continue,
     tool_executor_auto_node,
-    tool_executor_confirm_node,
 )
 
 # should_continue(state) con tool_iteration_count == MAX_TOOL_ITERATIONS (limite exacto, 6)
@@ -112,7 +111,6 @@ async def test_tool_executor_node_returns_error_message_for_unknown_tool():
         ],
         "session_id": "session-1",
         "tool_iteration_count": 0,
-        "bypass_confirmation": False,
     }
     config = {
         "configurable": {
@@ -133,37 +131,3 @@ async def test_tool_executor_node_returns_error_message_for_unknown_tool():
     # tool_executor_confirm_node, que siempre corre despues en el grafo real
     # (edge incondicional tools_auto -> tools_confirm) y cierra la ronda.
     assert "tool_iteration_count" not in result
-
-
-@pytest.mark.anyio
-async def test_tool_executor_node_raises_when_bypass_confirmation_used_with_high_risk_tool():
-    state = {
-        "messages": [
-            AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "id": "tc-write-1",
-                        "name": "write_file",
-                        "args": {"path": "a.txt", "content": "hi"},
-                    }
-                ],
-            )
-        ],
-        "session_id": "session-1",
-        "tool_iteration_count": 0,
-        "bypass_confirmation": True,
-    }
-    config = {
-        "configurable": {
-            "tool_ctx": {
-                "db": object(),
-                "user_id": "user-1",
-                "session_id": "session-1",
-                "enabled_tools": ["write_file"],
-            }
-        }
-    }
-
-    with pytest.raises(ValueError, match="is not safe for unattended cron execution"):
-        await tool_executor_confirm_node(state, config)

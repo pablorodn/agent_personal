@@ -298,18 +298,45 @@ async def chat(
         user_id=user_id,
     )
     agent_start = time.perf_counter()
-    result = await run_agent(
-        AgentInput(
-            user_id=user_id,
-            session_id=session_id,
-            system_prompt=system_prompt,
-            db=db,
-            enabled_tools=enabled_tools,
-            chat_model=resolved_chat_model,
-            message=clean_message,
-            attachment_blocks=attachment_blocks or None,
+    try:
+        result = await run_agent(
+            AgentInput(
+                user_id=user_id,
+                session_id=session_id,
+                system_prompt=system_prompt,
+                db=db,
+                enabled_tools=enabled_tools,
+                chat_model=resolved_chat_model,
+                message=clean_message,
+                attachment_blocks=attachment_blocks or None,
+            )
         )
-    )
+    except Exception as exc:
+        # Simetria con /api/chat/stream (ver el except Exception de _stream()
+        # mas abajo): sin este try/except, un timeout total (primario +
+        # fallback agotados en ainvoke_chat_with_fallback) o cualquier otra
+        # falla no manejada del agente terminaba en un 500 crudo de FastAPI
+        # sin mensaje util, mientras la ruta con streaming ya mostraba un
+        # error legible. 502 (no 500): la request del cliente era valida, lo
+        # que fallo es la dependencia upstream (el/los modelo/s de chat) -- un
+        # 500 aca mezclaria esto con bugs no manejados de la app en logs/
+        # alertas de monitoreo, cuando en realidad es un fallo externo ya
+        # atrapado y con una respuesta controlada.
+        logger.exception(
+            "Chat failed during agent execution.",
+            extra={
+                "event": "chat_agent_error",
+                "request_id": getattr(request.state, "request_id", None),
+                "session_id": session_id,
+                "user_id": user_id,
+                "reason": str(exc),
+            },
+        )
+        return Response(
+            content=_error_fragment("No pude generar la respuesta. Intenta de nuevo."),
+            media_type="text/html",
+            status_code=502,
+        )
     agent_ms = round((time.perf_counter() - agent_start) * 1000, 2)
     msg = await _finalize_turn(db, session, result, user_id)
     logger.info(

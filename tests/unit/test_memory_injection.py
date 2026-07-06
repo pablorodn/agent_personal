@@ -118,6 +118,61 @@ async def test_match_memories_uses_match_user_id_rpc_parameter():
     assert result == [{"id": "mem-1", "content": "dato"}]
 
 
+@pytest.mark.anyio
+async def test_match_memories_never_returns_another_users_rows():
+    """Bloque C3 (Fase 5): la unica cobertura de privacidad existente
+    (test_match_memories_uses_match_user_id_rpc_parameter, arriba) solo
+    verifica que el cliente Python ENVIA match_user_id en el payload de la
+    RPC -- no que el filtrado por usuario realmente aisla los datos. Este
+    test emula, en el fake de la RPC, el mismo filtro `WHERE user_id =
+    match_user_id` que hace match_memories() en Postgres (definida en
+    migrations/00004_long_term_memory.sql), guardando memorias de DOS
+    usuarios distintos y verificando que la busqueda de uno nunca devuelve
+    filas del otro.
+
+    Limitacion honesta: esto sigue sin ejecutar SQL real -- si el filtro
+    `WHERE user_id = match_user_id` se rompiera dentro de la funcion
+    Postgres real (y no en el cliente Python), ningun test de este repo lo
+    detectaria, porque ninguno corre contra una base real. Lo que este test
+    SI detecta es una regresion donde match_memories() (el wrapper Python en
+    app/db/queries/memories.py) dejara de mandar el match_user_id correcto
+    -- o lo mandara pero el resultado se mezclara indebidamente en el
+    camino Python."""
+
+    all_memories = [
+        {"id": "mem-a1", "user_id": "user-a", "content": "A prefiere el mate"},
+        {"id": "mem-a2", "user_id": "user-a", "content": "A trabaja como ingeniero"},
+        {"id": "mem-b1", "user_id": "user-b", "content": "B prefiere el te"},
+    ]
+
+    class _FakeResult:
+        def __init__(self, data):
+            self.data = data
+
+    class _FakeRpc:
+        def __init__(self, payload):
+            self._payload = payload
+
+        async def execute(self):
+            match_user_id = self._payload["match_user_id"]
+            filtered = [m for m in all_memories if m["user_id"] == match_user_id]
+            return _FakeResult(filtered[: self._payload["match_count"]])
+
+    class _FakeDb:
+        def rpc(self, _name, payload):
+            return _FakeRpc(payload)
+
+    result_for_a = await memories_module.match_memories(_FakeDb(), "user-a", [0.1, 0.2], limit=8)
+    result_for_b = await memories_module.match_memories(_FakeDb(), "user-b", [0.1, 0.2], limit=8)
+
+    assert {m["id"] for m in result_for_a} == {"mem-a1", "mem-a2"}
+    assert {m["id"] for m in result_for_b} == {"mem-b1"}
+    # La asercion clave anti-fuga: ningun resultado de A tiene el user_id de B
+    # y viceversa.
+    assert all(m["user_id"] == "user-a" for m in result_for_a)
+    assert all(m["user_id"] == "user-b" for m in result_for_b)
+
+
 def test_format_memory_block_separates_sections_by_type():
     memories = [
         {"id": "mem-1", "content": "Prefiere respuestas en español", "type": "episodic"},

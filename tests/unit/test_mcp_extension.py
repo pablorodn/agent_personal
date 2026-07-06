@@ -46,7 +46,6 @@ async def test_mcp_example_tool_executes_via_generic_tool_executor_auto_node(mon
         ],
         "session_id": "session-1",
         "tool_iteration_count": 0,
-        "bypass_confirmation": False,
     }
     config = {
         "configurable": {

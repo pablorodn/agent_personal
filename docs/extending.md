@@ -1,11 +1,10 @@
-# Plan de implementación de agent_total
+# Guía de extensión de agent_total
 
-Este documento describe el plan que se ejecutó para construir `agent_total` a partir del
-brief de producto (`docs/technical-brief.md`), y sirve como la misma metodología para
-implementar extensiones futuras (una tool nueva, una integración MCP, etc.). El plan invoca
-directamente las reglas ya declaradas en `.cursor/.rules/` — no las repite.
+Este documento es el procedimiento para agregar una integración nueva a `agent_total` (una
+tool nueva, una integración MCP, etc.) sobre el mecanismo de catálogo + adapter ya existente.
+Invoca directamente las reglas ya declaradas en `.cursor/.rules/` — no las repite.
 
-## Reglas que gobiernan el plan
+## Reglas que gobiernan el procedimiento
 
 - **Arquitectura e invariantes** (grafo canónico, capas, fuentes de verdad):
   `.cursor/.rules/architecture.mdc`.
@@ -18,9 +17,10 @@ directamente las reglas ya declaradas en `.cursor/.rules/` — no las repite.
 - **Cómo colaborar implementando** (documentación como fuente de verdad, qué hacer ante
   ambigüedad): `.cursor/.rules/implementation-agent.mdc`.
 
-## Mecanismo genérico de extensión (ya implementado)
+## Mecanismo genérico de extensión
 
-`tool_executor_node` no conoce nombres de tools: resuelve todo a través de dos puntos de
+Los nodos de ejecución de tools (`tool_executor_auto_node`/`tool_executor_confirm_node` en
+`app/agent/graph.py`) no conocen nombres de tools: resuelven todo a través de dos puntos de
 extensión únicos —
 
 1. `app/tools/catalog.py` (`TOOL_CATALOG`): metadatos (id, `risk`, textos de UI).
@@ -47,7 +47,7 @@ para un stub de referencia ya implementado (`mcp_example_ping`).
 5. **Migraciones**: si hace falta una tabla nueva, agregar una migración incremental en
    `migrations/`; nunca modificar una ya mergeada (`guardrails.mdc`).
 6. **Tests** (`testing.mdc`): unitarios para el handler y el schema; integración para el
-   flujo completo vía `tool_executor_node` (mismo patrón que
+   flujo completo vía `tool_executor_auto_node`/`tool_executor_confirm_node` (mismo patrón que
    `tests/unit/test_mcp_extension.py`).
 7. **Cierre**: `ruff check .`, `mypy app/`, `pytest -q` en verde
    (`implementation-agent.mdc`). Si se tocó documentación, confirmar que no quedaron

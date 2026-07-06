@@ -41,7 +41,6 @@ class AgentInput:
     chat_model: str = PRIMARY_CHAT_MODEL
     message: str | None = None
     resume_decision: str | None = None
-    bypass_confirmation: bool = False
     attachment_blocks: list[dict[str, Any]] | None = None
 
 
@@ -294,8 +293,6 @@ async def tool_executor_confirm_node(state: AgentState, config: RunnableConfig) 
         }
 
     tool_id, model_tc_id, args = pending.tool_id, pending.model_tc_id, pending.args
-    if state.get("bypass_confirmation"):
-        raise ValueError(f"Tool {tool_id} is not safe for unattended cron execution")
     record = await find_or_create_pending_tool_call(
         db=tool_ctx["db"],
         session_id=state["session_id"],
@@ -456,7 +453,6 @@ async def run_agent(agent_input: AgentInput) -> AgentOutput:
             "system_prompt": agent_input.system_prompt,
             "chat_model": agent_input.chat_model,
             "tool_iteration_count": 0,
-            "bypass_confirmation": agent_input.bypass_confirmation,
             # A diferencia de compaction_*, este campo es scratch de UNA sola
             # ronda de tool-calling (que tool_call_ids de ESTE batch ya se
             # confirmaron) y debe resetearse en cada turno nuevo, no persistir.

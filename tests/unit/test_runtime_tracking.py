@@ -45,7 +45,6 @@ async def test_low_tool_execution_inserts_tool_call_record(monkeypatch):
         ],
         "session_id": "session-1",
         "tool_iteration_count": 0,
-        "bypass_confirmation": False,
     }
     config = {
         "configurable": {
@@ -160,7 +159,6 @@ async def test_agent_node_binds_real_schema_and_tool_executor_runs_it(monkeypatc
         "messages": [*agent_state["messages"], ai_message],
         "session_id": "session-1",
         "tool_iteration_count": 0,
-        "bypass_confirmation": False,
     }
     tool_result = await tool_executor_auto_node(tool_state, config)
 
@@ -197,7 +195,6 @@ async def test_multiple_untracked_tool_calls_run_concurrently_and_preserve_order
         ],
         "session_id": "session-1",
         "tool_iteration_count": 0,
-        "bypass_confirmation": False,
     }
     config = {
         "configurable": {
@@ -272,7 +269,6 @@ async def test_confirmed_tool_handler_exception_marks_tool_call_failed_without_u
         ],
         "session_id": "session-1",
         "tool_iteration_count": 0,
-        "bypass_confirmation": False,
     }
     config = {
         "configurable": {
@@ -321,7 +317,6 @@ async def test_tool_executor_node_fails_closed_when_no_tools_enabled():
         ],
         "session_id": "session-1",
         "tool_iteration_count": 0,
-        "bypass_confirmation": False,
     }
     config = {
         "configurable": {

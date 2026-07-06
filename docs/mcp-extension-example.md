@@ -16,8 +16,9 @@ datos externa).
 
 ## Mecanismo genérico ya existente
 
-`app/agent/graph.py` no conoce los nombres de las tools: `tool_executor_node`
-resuelve el handler a ejecutar consultando dos únicos puntos de extensión:
+`app/agent/graph.py` no conoce los nombres de las tools: los nodos de ejecución
+(`tool_executor_auto_node`/`tool_executor_confirm_node`) resuelven el handler a
+ejecutar consultando dos únicos puntos de extensión:
 
 1. `app/tools/catalog.py` -- `TOOL_CATALOG` (metadatos: id, riesgo,
    textos de UI) y `TOOL_HANDLERS` en `app/tools/adapters.py` (ejecución).
@@ -43,7 +44,7 @@ dos archivos; `graph.py` queda intacto.
   actual no llega a conectarse a ella.
 - `tests/unit/test_mcp_extension.py`: verifica que la tool queda registrada
   en el catálogo y que se ejecuta correctamente a través de
-  `tool_executor_node` (importado sin cambios desde `app.agent.graph`),
+  `tool_executor_auto_node` (importado sin cambios desde `app.agent.graph`),
   exactamente igual que cualquier otra tool `low`.
 
 ## Cómo reemplazar el stub por una integración MCP real
@@ -64,7 +65,7 @@ dos archivos; `graph.py` queda intacto.
 1. Habilitar `mcp_example_ping` para un usuario desde `/settings` (aparece
    en la lista de tools igual que `read_file`/`write_file`).
 2. Iniciar una conversación donde el modelo decida invocar la tool
-   `mcp_example_ping` (o invocar `tool_executor_node` directamente, como
+   `mcp_example_ping` (o invocar `tool_executor_auto_node` directamente, como
    hace `tests/unit/test_mcp_extension.py`).
 3. La respuesta será un JSON `{"pong": true, "echo": "<mensaje>",
    "would_call_server": "<MCP_EXAMPLE_SERVER_URL o null>"}`.

@@ -124,6 +124,9 @@ def test_login_cookies_not_secure_by_default():
     _install_fake_login(app)
     client = TestClient(app)
     response = client.post("/login", data={"email": "a@b.com", "password": "123456"})
+    # Bloque B3 (Fase 5): faltaba verificar el contrato HTMX del login
+    # exitoso, no solo el flag `secure` de las cookies.
+    assert response.headers["hx-redirect"] == "/"
     set_cookie_headers = response.headers.get_list("set-cookie")
     assert set_cookie_headers
     assert not any("secure" in header.lower() for header in set_cookie_headers)
@@ -139,6 +142,7 @@ def test_login_cookies_secure_when_environment_is_production(monkeypatch):
     monkeypatch.setattr("app.routers.auth.get_settings", lambda: _ProductionSettings())
     client = TestClient(app)
     response = client.post("/login", data={"email": "a@b.com", "password": "123456"})
+    assert response.headers["hx-redirect"] == "/"
     set_cookie_headers = response.headers.get_list("set-cookie")
     assert set_cookie_headers
     assert all("secure" in header.lower() for header in set_cookie_headers)
@@ -251,6 +255,55 @@ def test_auth_middleware_refreshes_expired_access_token_and_continues_request(mo
     assert "sb-access-token=new-access-token" in set_cookie
     assert "sb-refresh-token=new-refresh-token" in set_cookie
     app.dependency_overrides.clear()
+
+
+def test_auth_middleware_redirects_to_login_when_access_and_refresh_tokens_both_invalid(
+    monkeypatch, caplog
+):
+    """Bloque B2 (Fase 5): todos los tests de "sesion expirada" existentes
+    (arriba) modelan un access-token vencido CON refresh_token valido (el
+    refresh tiene exito). Ninguno ejercita el branch real de sesion
+    REALMENTE expirada: refresh_session() tambien falla/no devuelve sesion
+    (app/middleware/auth.py:63-68, reason="invalid_or_expired_token")."""
+
+    class _FakeAuth:
+        async def get_user(self, _token: str):
+            raise RuntimeError("JWT expired")
+
+        async def refresh_session(self, _refresh_token: str):
+            class _FailedRefreshResponse:
+                session = None
+                user = None
+
+            return _FailedRefreshResponse()
+
+    class _FakeClient:
+        auth = _FakeAuth()
+
+    async def _fake_create_server_client():
+        return _FakeClient()
+
+    monkeypatch.setattr("app.middleware.auth.create_server_client", _fake_create_server_client)
+
+    client = TestClient(app)
+    with caplog.at_level("INFO", logger="app.middleware.auth"):
+        response = client.get(
+            "/",
+            cookies={
+                "sb-access-token": "expired-access-token",
+                "sb-refresh-token": "also-expired-refresh-token",
+            },
+            follow_redirects=False,
+        )
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/login"
+    # No debe rotar cookies: la sesion no se pudo recuperar de ninguna forma.
+    assert not response.headers.get_list("set-cookie")
+    matching_records = [
+        r for r in caplog.records if getattr(r, "reason", None) == "invalid_or_expired_token"
+    ]
+    assert matching_records
 
 
 def _install_fake_refresh_middleware(monkeypatch):
@@ -368,6 +421,28 @@ def test_auth_middleware_logs_real_exception_reason_for_unexpected_provider_erro
         getattr(record, "reason", None) == "boom - unexpected supabase client failure"
         for record in warning_records
     )
+
+
+def test_logout_redirects_to_login_and_deletes_session_cookies(
+    patch_auth_middleware, auth_cookie
+):
+    """Bloque B1 (Fase 5): POST /logout no tenia ningun test en todo el repo."""
+    client = TestClient(app)
+    response = client.post("/logout", cookies=auth_cookie)
+
+    assert response.status_code == 200
+    assert response.headers["hx-redirect"] == "/login"
+
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    access_token_header = next(h for h in set_cookie_headers if h.startswith("sb-access-token="))
+    refresh_token_header = next(h for h in set_cookie_headers if h.startswith("sb-refresh-token="))
+    # delete_cookie() emite un Set-Cookie con valor vacio y expiracion en el
+    # pasado (Max-Age=0) -- asi es como el browser efectivamente borra la
+    # cookie, no solo la vacia de contenido.
+    assert 'sb-access-token=""' in access_token_header or "sb-access-token=;" in access_token_header
+    assert "Max-Age=0" in access_token_header
+    assert 'sb-refresh-token=""' in refresh_token_header or "sb-refresh-token=;" in refresh_token_header
+    assert "Max-Age=0" in refresh_token_header
 
 
 def test_auth_middleware_does_not_mask_downstream_errors_as_login_redirect(

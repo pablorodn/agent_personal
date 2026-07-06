@@ -66,13 +66,6 @@ async def update_tool_call_status(
     await db.table("tool_calls").update(update_data).eq("id", tool_call_id).execute()
 
 
-async def get_tool_call(db: AsyncClient, tool_call_id: str) -> ToolCall | None:
-    result = await db.table("tool_calls").select("*").eq("id", tool_call_id).limit(1).execute()
-    if not result.data:
-        return None
-    return ToolCall(**result.data[0])
-
-
 async def get_pending_tool_call(db: AsyncClient, tool_call_id: str) -> ToolCall | None:
     result = (
         await db.table("tool_calls")
