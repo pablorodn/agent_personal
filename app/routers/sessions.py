@@ -6,7 +6,6 @@ from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
 
 from app.agent.checkpointer import get_checkpointer
-from app.agent.model import CURATED_CHAT_MODELS, validate_model_selection
 from app.db.queries.messages import clear_session_messages
 from app.db.queries.profiles import get_profile
 from app.db.queries.sessions import (
@@ -44,8 +43,6 @@ async def post_session(
     session = await create_session(db, user_id, channel="web")
     sessions = await list_sessions(db, user_id=user_id, channel="web")
     profile = await get_profile(db, user_id)
-    stored_default_model = getattr(profile, "default_model", None) if profile else None
-    selected_model = validate_model_selection(stored_default_model, user_id=user_id)
     return templates.TemplateResponse(
         request,
         "partials/chat_session_switch.html",
@@ -56,8 +53,6 @@ async def post_session(
             "sessions": sessions,
             "current_session_id": session.id,
             "has_pending_confirmation": False,
-            "curated_models": CURATED_CHAT_MODELS,
-            "selected_model": selected_model,
         },
     )
 

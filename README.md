@@ -17,6 +17,20 @@ No resuelve un dominio específico: el objetivo es que cualquier desarrollo futu
 
 Todo lo esencial de esta plantilla vive en archivos del repo (código + docs), no en memoria conversacional de ninguna sesión de asistente.
 
+## Correr en local
+
+No hay `Makefile` ni script wrapper: se levanta directo con `uvicorn` (no tiene entrypoint `if __name__`).
+
+```bash
+uv run uvicorn app.main:app --port 8000 --host 127.0.0.1
+```
+
+No hay endpoint `/health`; usar `GET /login` (público, 200 cuando el server ya arrancó) para chequear que está arriba. El log de arranque exitoso muestra `"event": "runtime_warmup"` seguido de `Application startup complete.` — si en cambio aparece `runtime_warmup_failed`, el pool del checkpointer no pudo conectar a `DATABASE_URL`.
+
+**Importante**: `.env` puede estar apuntando a un proyecto Supabase real (no local) — antes de loguearte o mandar mensajes de chat, confirmá que `DATABASE_URL`/`SUPABASE_URL` son el entorno que esperás, porque cualquier interacción escribe datos reales ahí.
+
+Para agentes de Claude Code: el skill de proyecto `.claude/skills/run-server/SKILL.md` documenta el patrón completo (background-launch + poll de readiness + ruido conocido de Langfuse/compactación a ignorar).
+
 ## Documentación
 
 | Documento | Qué describe |

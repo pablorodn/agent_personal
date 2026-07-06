@@ -23,15 +23,31 @@ async def create_tool_call(
     args: dict[str, Any],
     needs_confirmation: bool,
     model_tool_call_id: str | None,
+    *,
+    status: str | None = None,
+    result_json: dict[str, Any] | None = None,
 ) -> ToolCall:
-    payload = {
+    """Inserta una fila en tool_calls.
+
+    `status`/`result_json` permiten a run_with_tracking (rama sin confirmacion)
+    escribir el estado final (executed/failed) en un unico INSERT, en vez del
+    patron INSERT-optimista-luego-UPDATE. La rama con confirmacion sigue usando
+    los defaults (needs_confirmation=True -> status="pending_confirmation" sin
+    result_json), sin cambio de comportamiento.
+    """
+    resolved_status = status or ("pending_confirmation" if needs_confirmation else "executed")
+    payload: dict[str, Any] = {
         "session_id": session_id,
         "tool_name": tool_name,
         "arguments_json": args,
-        "status": "pending_confirmation" if needs_confirmation else "executed",
+        "status": resolved_status,
         "requires_confirmation": needs_confirmation,
         "model_tool_call_id": model_tool_call_id,
     }
+    if result_json is not None:
+        payload["result_json"] = result_json
+    if resolved_status in {"executed", "failed"}:
+        payload["finished_at"] = datetime.now(timezone.utc).isoformat()
     result = await db.table("tool_calls").insert(payload).execute()
     return ToolCall(**result.data[0])
 

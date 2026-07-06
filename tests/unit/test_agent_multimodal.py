@@ -22,7 +22,7 @@ def test_build_initial_messages_attachments_only_omits_text_block():
 
 
 def test_build_initial_messages_text_and_attachments_combines_blocks():
-    blocks = [{"type": "file", "base64": "abc", "mime_type": "application/pdf"}]
+    blocks = [{"type": "image", "base64": "abc", "mime_type": "image/jpeg"}]
 
     messages = _build_initial_messages("revisa esto", blocks)
 
@@ -39,7 +39,13 @@ def test_build_initial_messages_empty_everything_returns_no_messages():
 async def test_run_agent_passes_multimodal_content_to_graph(monkeypatch):
     captured: dict[str, object] = {}
 
+    class _FakeSnapshot:
+        values: dict = {}
+
     class _FakeApp:
+        async def aget_state(self, config=None):
+            return _FakeSnapshot()
+
         async def ainvoke(self, payload, config=None):
             captured["payload"] = payload
             return {"messages": [AIMessage(content="ok")]}

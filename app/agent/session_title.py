@@ -4,7 +4,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from supabase import AsyncClient
 
 from app.agent.model import create_compaction_model
-from app.db.queries.messages import AgentMessage, get_session_messages
+from app.db.queries.messages import get_first_user_message_with_content
 from app.db.queries.sessions import update_session_title
 
 logger = logging.getLogger(__name__)
@@ -18,16 +18,6 @@ TITLE_SYSTEM_PROMPT = (
 )
 
 
-def _first_texted_user_message(messages: list[AgentMessage]) -> str | None:
-    for message in messages:
-        if message.role != "user":
-            continue
-        content = (message.content or "").strip()
-        if content:
-            return content
-    return None
-
-
 def _clean_title(raw: str) -> str:
     title = raw.strip()
     if len(title) >= 2 and title[0] in "\"'" and title[-1] in "\"'":
@@ -38,9 +28,11 @@ def _clean_title(raw: str) -> str:
 
 async def generate_session_title(db: AsyncClient, session_id: str) -> None:
     try:
-        messages = await get_session_messages(db, session_id)
-        seed_message = _first_texted_user_message(messages)
-        if seed_message is None:
+        first_message = await get_first_user_message_with_content(db, session_id)
+        if first_message is None:
+            return
+        seed_message = (first_message.content or "").strip()
+        if not seed_message:
             return
         model = create_compaction_model()
         response = await model.ainvoke(

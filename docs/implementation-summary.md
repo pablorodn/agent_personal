@@ -239,8 +239,10 @@ resultado como dataset run en Langfuse cuando hay credenciales configuradas.
 
 ## Adjuntos multimodales y selector de modelo (detalle)
 
-- Adjuntos: imágenes (`image/png`, `image/jpeg`, `image/webp`, hasta 5 MB) y PDF
-  (`application/pdf`, hasta 10 MB, best-effort si el modelo lo ignora), máximo 3 por mensaje.
+- Adjuntos: solo imágenes (`image/png`, `image/jpeg`, `image/webp`, hasta 5 MB), máximo 3
+  por mensaje. El soporte de PDF se retiró: el archivo completo en base64 quedaba dentro del
+  historial que persiste el checkpointer de LangGraph y se re-enviaba al modelo en cada turno
+  posterior de la sesión, degradando la latencia de forma permanente.
   Metadata en `agent_messages.structured_payload` (`{"type":"attachment_note","count":N,
   "kinds":[...]}`) sin persistir el archivo en esa tabla — el checkpointer de LangGraph sí
   persiste el historial completo de mensajes, incluidos los bloques multimodales.

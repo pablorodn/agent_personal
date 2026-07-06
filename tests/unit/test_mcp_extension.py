@@ -3,7 +3,7 @@ import json
 import pytest
 from langchain_core.messages import AIMessage
 
-from app.agent.graph import tool_executor_node
+from app.agent.graph import tool_executor_auto_node
 from app.tools.catalog import get_tool_definition, get_tool_risk
 from app.tools.mcp.example_tool import MCP_EXAMPLE_TOOL_ID, handle_mcp_example_ping
 
@@ -22,7 +22,7 @@ async def test_mcp_example_handler_returns_stub_response():
 
 
 @pytest.mark.anyio
-async def test_mcp_example_tool_executes_via_generic_tool_executor_node(monkeypatch):
+async def test_mcp_example_tool_executes_via_generic_tool_executor_auto_node(monkeypatch):
     tracking_calls: list[dict[str, object]] = []
 
     async def _fake_run_with_tracking(**kwargs):
@@ -59,11 +59,13 @@ async def test_mcp_example_tool_executes_via_generic_tool_executor_node(monkeypa
         }
     }
 
-    result = await tool_executor_node(state, config)
+    result = await tool_executor_auto_node(state, config)
 
     assert len(tracking_calls) == 1
     assert tracking_calls[0]["tool_id"] == MCP_EXAMPLE_TOOL_ID
-    assert result["tool_iteration_count"] == 1
+    # tool_executor_auto_node no incrementa tool_iteration_count (lo hace
+    # tool_executor_confirm_node, que siempre corre despues en el grafo real).
+    assert "tool_iteration_count" not in result
     assert len(result["messages"]) == 1
     payload = json.loads(result["messages"][0].content)
     assert payload == {"pong": True, "echo": "ping", "would_call_server": None}

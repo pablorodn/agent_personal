@@ -28,18 +28,15 @@ def test_real_attachments_filters_empty_file_slots():
 
 
 @pytest.mark.anyio
-async def test_build_attachment_blocks_accepts_image_and_pdf():
+async def test_build_attachment_blocks_accepts_image():
     image = _upload_file("photo.png", b"\x89PNG\r\n", "image/png")
-    pdf = _upload_file("doc.pdf", b"%PDF-1.4", "application/pdf")
 
-    blocks, kinds = await build_attachment_blocks([image, pdf])
+    blocks, kinds = await build_attachment_blocks([image])
 
-    assert kinds == ["image", "pdf"]
-    assert len(blocks) == 2
+    assert kinds == ["image"]
+    assert len(blocks) == 1
     assert blocks[0]["type"] == "image"
     assert blocks[0]["mime_type"] == "image/png"
-    assert blocks[1]["type"] == "file"
-    assert blocks[1]["mime_type"] == "application/pdf"
 
 
 @pytest.mark.anyio
@@ -69,11 +66,11 @@ async def test_build_attachment_blocks_rejects_oversized_image():
 
 
 @pytest.mark.anyio
-async def test_build_attachment_blocks_rejects_oversized_pdf():
-    oversized = _upload_file("big.pdf", b"x" * (10 * 1024 * 1024 + 1), "application/pdf")
+async def test_build_attachment_blocks_rejects_pdf():
+    pdf = _upload_file("doc.pdf", b"%PDF-1.4", "application/pdf")
 
-    with pytest.raises(AttachmentValidationError, match="10 MB"):
-        await build_attachment_blocks([oversized])
+    with pytest.raises(AttachmentValidationError, match="no permitido"):
+        await build_attachment_blocks([pdf])
 
 
 @pytest.mark.anyio

@@ -3,6 +3,16 @@ from typing import Literal
 from pydantic import BaseModel
 
 ToolRisk = Literal["low", "medium", "high"]
+# Politica de riesgo (L5): "low" significa "se ejecuta sin confirmacion Y en
+# paralelo con otras tools 'low' del mismo batch" (ver asyncio.gather en
+# tool_executor_auto_node, app/agent/graph.py). Por eso una tool "low" debe
+# ser de solo lectura, o al menos conmutativa/segura bajo ejecucion
+# concurrente consigo misma y con otras tools "low" del mismo turno. Un
+# patron read-modify-write (ej. incrementar un contador propio) marcado como
+# "low" introduce una condicion de carrera real de lost-update que no existe
+# hoy porque ninguna tool "low" actual escribe estado compartido. Si una tool
+# nueva necesita mutar estado de forma no conmutativa, usar "medium"/"high"
+# (requiere confirmacion, se ejecuta sola) en vez de "low".
 
 
 class ToolDefinition(BaseModel):

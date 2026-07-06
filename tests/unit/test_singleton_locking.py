@@ -44,19 +44,18 @@ async def test_create_server_client_sequential_calls_reuse_same_instance(monkeyp
 
 async def test_get_checkpointer_concurrent_calls_run_setup_once(monkeypatch):
     checkpointer._saver = None
-    checkpointer._conn = None
+    checkpointer._pool = None
     setup_calls = 0
 
-    class _FakeConnection:
-        def __class_getitem__(cls, _item):
-            return cls
+    class _FakePool:
+        def __init__(self, *_args, **_kwargs):
+            pass
 
-        @classmethod
-        async def connect(cls, *_args, **_kwargs):
-            return cls()
+        async def open(self):
+            pass
 
     class _FakeSaver:
-        def __init__(self, _conn):
+        def __init__(self, _pool):
             pass
 
         async def setup(self):
@@ -64,7 +63,7 @@ async def test_get_checkpointer_concurrent_calls_run_setup_once(monkeypatch):
             setup_calls += 1
             await asyncio.sleep(0.05)
 
-    monkeypatch.setattr(checkpointer, "AsyncConnection", _FakeConnection)
+    monkeypatch.setattr(checkpointer, "AsyncConnectionPool", _FakePool)
     monkeypatch.setattr(checkpointer, "AsyncPostgresSaver", _FakeSaver)
 
     results = await asyncio.gather(*[checkpointer.get_checkpointer() for _ in range(5)])

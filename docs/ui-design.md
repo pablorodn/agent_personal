@@ -68,7 +68,7 @@ Estado real actual:
 
 Contrato del formulario:
 
-- `input type="file"` con `accept="image/png,image/jpeg,image/webp,application/pdf"`.
+- `input type="file"` con `accept="image/png,image/jpeg,image/webp"`.
 - `enctype="multipart/form-data"` en `#chat-form`.
 - Envío de texto + archivos en una sola request. La UI real usa `POST /api/chat/stream`; `POST /api/chat` soporta el mismo contrato de adjuntos como ruta equivalente sin streaming.
 - Debe permitir pegar imagen desde portapapeles (`paste` sobre el input/área de chat) y adjuntarla sin pasar por selector de archivos.
@@ -82,7 +82,6 @@ Validaciones UX mínimas:
 Límites:
 
 - Imagen: hasta 5 MB.
-- PDF: hasta 10 MB.
 - Máximo 3 adjuntos por mensaje.
 - Sin persistencia de archivos en servidor o base de datos.
 - El mensaje de texto es opcional cuando el turno incluye adjuntos: se permite enviar solo adjuntos sin texto acompañante.
@@ -90,7 +89,7 @@ Límites:
 Alcance real de soporte multimodal:
 
 - Imágenes: soporte garantizado para ambos modelos de la lista curada.
-- PDF: soporte best-effort; se envía como bloque `document`, pero si el modelo no lo procesa, el turno continúa sin bloqueo ni error duro para el usuario.
+- PDF: no soportado (se retiró el feature; el archivo completo en base64 viajaba dentro del historial del checkpointer y degradaba la latencia de todos los turnos posteriores de la sesión).
 
 Persistencia de contexto de adjuntos en historial:
 

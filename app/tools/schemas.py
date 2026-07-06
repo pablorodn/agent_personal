@@ -43,7 +43,8 @@ TOOL_ARGS_SCHEMAS: dict[str, type[BaseModel]] = {
 def build_tool_schemas(enabled_tool_ids: list[str]) -> list[dict[str, Any]]:
     """Convierte las entradas habilitadas de TOOL_CATALOG en schemas de function-calling
     (formato OpenAI) para bind_tools(). Solo describe nombre/descripción/parámetros;
-    la ejecución real sigue pasando por TOOL_HANDLERS en tool_executor_node."""
+    la ejecución real sigue pasando por TOOL_HANDLERS en tool_executor_auto_node/
+    tool_executor_confirm_node."""
     schemas: list[dict[str, Any]] = []
     for tool in TOOL_CATALOG:
         if tool.id not in enabled_tool_ids:

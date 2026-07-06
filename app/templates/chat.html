@@ -38,9 +38,7 @@
   const ATTACHMENT_LIMITS = {
     maxCount: 3,
     maxImageBytes: 5 * 1024 * 1024,
-    maxPdfBytes: 10 * 1024 * 1024,
     imageTypes: ["image/png", "image/jpeg", "image/webp"],
-    pdfTypes: ["application/pdf"],
   };
 
   let pendingAttachments = [];
@@ -64,13 +62,7 @@
       }
       return null;
     }
-    if (ATTACHMENT_LIMITS.pdfTypes.includes(file.type)) {
-      if (file.size > ATTACHMENT_LIMITS.maxPdfBytes) {
-        return "El PDF '" + file.name + "' supera el límite de 10 MB.";
-      }
-      return null;
-    }
-    return "Tipo de archivo no permitido: '" + file.name + "'. Solo imágenes (PNG, JPEG, WEBP) o PDF.";
+    return "Tipo de archivo no permitido: '" + file.name + "'. Solo imágenes (PNG, JPEG, WEBP).";
   }
 
   function syncAttachmentInput() {

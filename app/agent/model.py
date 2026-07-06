@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from collections.abc import Sequence
 from typing import Any
@@ -46,6 +45,17 @@ def create_chat_model(
         temperature=0.2,
         max_tokens=1000,
         timeout=CHAT_TIMEOUT_SECONDS,
+        # L2 (tradeoff documentado, sin cambio de comportamiento en esta ronda):
+        # max_retries=0 hace que CUALQUIER error transitorio del modelo primario
+        # (incluido un 429 de rate limit de OpenRouter) caiga directo a
+        # ainvoke_chat_with_fallback() usando FALLBACK_CHAT_MODEL, en vez de
+        # reintentar con backoff corto sobre el mismo modelo. Es intencional:
+        # prioriza latencia (fallback rapido) sobre "insistir" en el primario.
+        # La contra es que un burst breve de 429 empuja todo el trafico al
+        # modelo de fallback aunque el primario se hubiera recuperado enseguida.
+        # Un backoff corto especifico para 429 quedo fuera de alcance de esta
+        # ronda (Fase 3) — evaluar si en la practica los 429 de OpenRouter son
+        # frecuentes antes de invertir en eso.
         max_retries=0,
         openai_api_key=settings.openrouter_api_key,
         openai_api_base=OPENROUTER_BASE_URL,
@@ -75,7 +85,11 @@ async def ainvoke_chat_with_fallback(
     fallback_model = FALLBACK_CHAT_MODEL if primary_model != FALLBACK_CHAT_MODEL else PRIMARY_CHAT_MODEL
     primary = create_chat_model(primary_model, tool_schemas)
     try:
-        result = await asyncio.wait_for(primary.ainvoke(messages), timeout=CHAT_TIMEOUT_SECONDS)
+        # No se envuelve en asyncio.wait_for: sería redundante con el timeout=CHAT_TIMEOUT_SECONDS
+        # ya fijado en create_chat_model. A diferencia de la llamada primaria, la llamada de
+        # fallback (mas abajo) nunca tuvo un wait_for propio, asi que el timeout del cliente es
+        # lo unico que la acota — eliminarlo la dejaria sin limite de tiempo.
+        result = await primary.ainvoke(messages)
         if isinstance(result, AIMessage):
             return result
         return AIMessage(content=str(getattr(result, "content", "")))

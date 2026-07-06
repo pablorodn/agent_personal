@@ -107,13 +107,13 @@ def test_chat_allows_attachment_only_message_with_empty_text(
         "/api/chat",
         cookies=auth_cookie,
         data={"message": "", "session_id": "session-1"},
-        files=[("attachments", ("doc.pdf", b"%PDF-1.4", "application/pdf"))],
+        files=[("attachments", ("photo.png", b"\x89PNG\r\n\x1a\n", "image/png"))],
     )
 
     assert response.status_code == 200
     user_message = captured["messages"][0]
     assert user_message["content"] == ""
-    assert user_message["structured_payload"]["kinds"] == ["pdf"]
+    assert user_message["structured_payload"]["kinds"] == ["image"]
     app.dependency_overrides.clear()
 
 
@@ -221,13 +221,13 @@ def test_chat_stream_allows_attachment_only_message_with_empty_text(
         "/api/chat/stream",
         cookies=auth_cookie,
         data={"message": "", "session_id": "session-1"},
-        files=[("attachments", ("doc.pdf", b"%PDF-1.4", "application/pdf"))],
+        files=[("attachments", ("photo.png", b"\x89PNG\r\n\x1a\n", "image/png"))],
     )
 
     assert response.status_code == 200
     user_message = captured["messages"][0]
     assert user_message["content"] == ""
-    assert user_message["structured_payload"]["kinds"] == ["pdf"]
+    assert user_message["structured_payload"]["kinds"] == ["image"]
     app.dependency_overrides.clear()
 
 

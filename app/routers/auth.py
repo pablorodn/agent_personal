@@ -32,7 +32,12 @@ async def login(
     password: str = Form(...),
     db: AsyncClient = Depends(_db),
 ):
-    result = await db.auth.sign_in_with_password({"email": email, "password": password})
+    try:
+        result = await db.auth.sign_in_with_password({"email": email, "password": password})
+    except AuthApiError:
+        return templates.TemplateResponse(
+            request, "partials/login_form.html", {"request": request, "error": "Credenciales inválidas"}
+        )
     if result.user and result.session:
         response = HTMLResponse(status_code=200)
         response.headers["HX-Redirect"] = "/"

@@ -70,7 +70,13 @@ async def test_run_agent_passes_langfuse_config_on_message(monkeypatch):
 
     captured: dict[str, object] = {}
 
+    class _FakeSnapshot:
+        values: dict = {}
+
     class _FakeApp:
+        async def aget_state(self, config=None):
+            return _FakeSnapshot()
+
         async def ainvoke(self, _payload, config=None):
             captured["config"] = config
             return {"messages": [AIMessage(content="ok")]}

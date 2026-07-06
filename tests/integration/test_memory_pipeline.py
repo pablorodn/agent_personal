@@ -17,8 +17,10 @@ def test_memory_policy_allows_regular_text():
 async def test_flush_session_memory_blocks_sensitive_content(monkeypatch):
     calls: dict[str, object] = {}
 
-    async def _fake_messages(_db, _session_id):
-        return [{"content": "my password is secret123"}]
+    async def _fake_last_message(_db, _session_id):
+        return AgentMessage(
+            id="msg-1", session_id="session-1", role="user", content="my password is secret123"
+        )
 
     async def _fake_embedding(_text):
         calls["embedding"] = _text
@@ -27,7 +29,7 @@ async def test_flush_session_memory_blocks_sensitive_content(monkeypatch):
     async def _fake_save_memory(_db, **kwargs):
         calls["save"] = kwargs
 
-    monkeypatch.setattr("app.agent.memory_flush.get_session_messages", _fake_messages)
+    monkeypatch.setattr("app.agent.memory_flush.get_last_user_message", _fake_last_message)
     monkeypatch.setattr("app.agent.memory_flush.generate_embedding", _fake_embedding)
     monkeypatch.setattr("app.agent.memory_flush.save_memory", _fake_save_memory)
 
@@ -39,13 +41,13 @@ async def test_flush_session_memory_blocks_sensitive_content(monkeypatch):
 
 @pytest.mark.anyio
 async def test_flush_session_memory_handles_external_errors(monkeypatch):
-    async def _fake_messages(_db, _session_id):
-        return [{"content": "hola"}]
+    async def _fake_last_message(_db, _session_id):
+        return AgentMessage(id="msg-1", session_id="session-1", role="user", content="hola")
 
     async def _broken_embedding(_text):
         raise RuntimeError("embedding down")
 
-    monkeypatch.setattr("app.agent.memory_flush.get_session_messages", _fake_messages)
+    monkeypatch.setattr("app.agent.memory_flush.get_last_user_message", _fake_last_message)
     monkeypatch.setattr("app.agent.memory_flush.generate_embedding", _broken_embedding)
 
     await flush_session_memory(db=object(), user_id="user-1", session_id="session-1")
@@ -55,13 +57,10 @@ async def test_flush_session_memory_handles_external_errors(monkeypatch):
 async def test_flush_session_memory_persists_user_content_not_assistant(monkeypatch):
     calls: dict[str, object] = {}
 
-    async def _fake_messages(_db, _session_id):
-        return [
-            AgentMessage(id="msg-1", session_id="session-1", role="user", content="mensaje del usuario"),
-            AgentMessage(
-                id="msg-2", session_id="session-1", role="assistant", content="respuesta del asistente"
-            ),
-        ]
+    async def _fake_last_message(_db, _session_id):
+        # get_last_user_message ya filtra por role="user" a nivel SQL: un
+        # mensaje de assistant nunca llega a ser el resultado de esta función.
+        return AgentMessage(id="msg-1", session_id="session-1", role="user", content="mensaje del usuario")
 
     async def _fake_embedding(_text):
         calls["embedding"] = _text
@@ -70,7 +69,7 @@ async def test_flush_session_memory_persists_user_content_not_assistant(monkeypa
     async def _fake_save_memory(_db, **kwargs):
         calls["save"] = kwargs
 
-    monkeypatch.setattr("app.agent.memory_flush.get_session_messages", _fake_messages)
+    monkeypatch.setattr("app.agent.memory_flush.get_last_user_message", _fake_last_message)
     monkeypatch.setattr("app.agent.memory_flush.generate_embedding", _fake_embedding)
     monkeypatch.setattr("app.agent.memory_flush.save_memory", _fake_save_memory)
 

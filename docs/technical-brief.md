@@ -24,7 +24,7 @@ Stack: FastAPI + LangGraph + Supabase + OpenRouter + Langfuse, UI SSR en Jinja2/
   ejecución para todas las tools.
 - Catálogo de herramientas extensible por catálogo + adapter (sin tocar el grafo), con punto
   de extensión MCP.
-- Adjuntos multimodales (imagen + PDF) y selector de modelo por usuario.
+- Adjuntos multimodales (imagen) y selector de modelo por usuario.
 - Trazabilidad vía Langfuse y evaluaciones automatizadas contra el runtime real.
 
 ## 3) Arquitectura del producto

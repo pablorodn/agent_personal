@@ -1,9 +1,14 @@
+import logging
 from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+SECRET_KEY_MIN_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -27,12 +32,44 @@ class Settings(BaseSettings):
 
     environment: str = Field(default="development", alias="ENVIRONMENT")
 
+    @field_validator("secret_key")
+    @classmethod
+    def _validate_secret_key_length(cls, value: str) -> str:
+        if len(value) < SECRET_KEY_MIN_LENGTH:
+            raise ValueError(
+                f"SECRET_KEY must be at least {SECRET_KEY_MIN_LENGTH} characters long "
+                f"(got {len(value)}); a short/weak key is unsafe for signing sessions/cookies."
+            )
+        return value
+
+    @field_validator("database_url")
+    @classmethod
+    def _validate_database_url(cls, value: str) -> str:
+        normalized = value.strip().strip("'").strip('"')
+        parsed = urlparse(normalized)
+        if not parsed.scheme or not parsed.hostname:
+            raise ValueError(
+                "DATABASE_URL must include a scheme and hostname (e.g. "
+                "'postgresql://user:pass@host:5432/db')."
+            )
+        return value
+
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
 
     @property
     def is_file_tools_enabled(self) -> bool:
+        if self.file_tools_enabled is not None:
+            normalized = self.file_tools_enabled.strip()
+            if normalized not in ("true", "false"):
+                logger.warning(
+                    "FILE_TOOLS_ENABLED has an unrecognized value; treating as disabled (fail-closed).",
+                    extra={
+                        "event": "file_tools_enabled_unrecognized_value",
+                        "raw_value": self.file_tools_enabled,
+                    },
+                )
         return self.file_tools_enabled == "true"
 
     @property

@@ -7,17 +7,18 @@ from app.agent.graph import (
     MAX_TOOL_ITERATIONS,
     parse_pending_confirmation,
     should_continue,
-    tool_executor_node,
+    tool_executor_auto_node,
+    tool_executor_confirm_node,
 )
 
 # should_continue(state) con tool_iteration_count == MAX_TOOL_ITERATIONS (limite exacto, 6)
 # ya esta cubierto por test_should_continue_routes_to_limit_when_max_iterations_exceeded en
 # test_runtime_tracking.py. limit_reached_node() ya esta cubierto (content exacto y sin
 # tool_calls) por test_limit_reached_preserves_unexecuted_tool_calls_and_adds_limit_message
-# en el mismo archivo. tool_executor_node() para tool conocida-pero-no-habilitada ya esta
+# en el mismo archivo. tool_executor_auto_node() para tool conocida-pero-no-habilitada ya esta
 # cubierto por test_tool_executor_node_fails_closed_when_no_tools_enabled, y para tool de
-# riesgo low ejecutada via run_with_tracking (incluyendo el incremento de
-# tool_iteration_count) por test_low_tool_execution_inserts_tool_call_record.
+# riesgo low ejecutada via run_with_tracking por test_low_tool_execution_inserts_tool_call_record
+# (el incremento de tool_iteration_count lo hace tool_executor_confirm_node, no este nodo).
 # _build_initial_messages() ya esta cubierto en su totalidad (texto solo, adjuntos solo,
 # texto+adjuntos, y el caso vacio) por los 4 tests de test_agent_multimodal.py. Ninguno de
 # esos casos se duplica aqui.
@@ -124,11 +125,14 @@ async def test_tool_executor_node_returns_error_message_for_unknown_tool():
         }
     }
 
-    result = await tool_executor_node(state, config)
+    result = await tool_executor_auto_node(state, config)
 
     assert len(result["messages"]) == 1
     assert json.loads(result["messages"][0].content) == {"error": "Unknown tool: does_not_exist"}
-    assert result["tool_iteration_count"] == 1
+    # tool_executor_auto_node no incrementa tool_iteration_count: eso lo hace
+    # tool_executor_confirm_node, que siempre corre despues en el grafo real
+    # (edge incondicional tools_auto -> tools_confirm) y cierra la ronda.
+    assert "tool_iteration_count" not in result
 
 
 @pytest.mark.anyio
@@ -162,4 +166,4 @@ async def test_tool_executor_node_raises_when_bypass_confirmation_used_with_high
     }
 
     with pytest.raises(ValueError, match="is not safe for unattended cron execution"):
-        await tool_executor_node(state, config)
+        await tool_executor_confirm_node(state, config)

@@ -98,6 +98,28 @@ def _install_fake_login(app_, *, monkeypatch=None):
     app_.dependency_overrides[auth_router._db] = _fake_db
 
 
+def test_login_wrong_password_returns_form_error_not_500():
+    class _FakeAuth:
+        async def sign_in_with_password(self, _payload):
+            raise AuthApiError("Invalid login credentials", 400, None)
+
+    class _FakeDB:
+        auth = _FakeAuth()
+
+    async def _fake_db():
+        return _FakeDB()
+
+    app.dependency_overrides[auth_router._db] = _fake_db
+    client = TestClient(app)
+    response = client.post(
+        "/login",
+        data={"email": "a@b.com", "password": "wrong-password"},
+    )
+    assert response.status_code == 200
+    assert "Credenciales inválidas" in response.text
+    app.dependency_overrides.clear()
+
+
 def test_login_cookies_not_secure_by_default():
     _install_fake_login(app)
     client = TestClient(app)
