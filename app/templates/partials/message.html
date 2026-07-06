@@ -10,6 +10,7 @@
       <p class="whitespace-pre-wrap">{{ msg.content }}</p>
       {% endif %}
     {% endif %}
+    {# Debe reflejar el mismo texto/clases que attachmentNoteHtml() en app/static/js/chat.js. Si cambia uno, cambiar el otro. #}
     {% if msg.structured_payload and msg.structured_payload["type"] == "attachment_note" %}
       <p class="mt-1 text-xs opacity-80">📎 Se enviaron {{ msg.structured_payload["count"] }} archivo(s)</p>
     {% endif %}

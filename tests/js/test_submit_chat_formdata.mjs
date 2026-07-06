@@ -1,10 +1,11 @@
-// Verificacion empirica (Fase 14) del fix de orden en submitChat() de app/templates/chat.html:
+// Verificacion empirica (Fase 14) del fix de orden en submitChat() de app/static/js/chat.js:
 // el bug consistia en que renderOutgoingMessage(form) limpiaba #chat-input ANTES de que
 // new FormData(form) se construyera, por lo que el campo "message" llegaba vacio al backend.
-// Este script carga el <script> real del archivo (mismo mecanismo de extraccion que ya se usa
-// para `node --check`) dentro de un DOM real (jsdom), reproduce el formulario real de chat.html,
-// simula texto escrito por el usuario, invoca la funcion submitChat() real (sin reescribirla a
-// mano) y verifica el contenido efectivo del FormData que se enviaria a fetch().
+// Desde la Fase 4 (Bloque A) el JS de chat vive en app/static/js/chat.js, servido como archivo
+// estatico (antes estaba inline en app/templates/chat.html). Este script carga ese archivo real
+// dentro de un DOM real (jsdom), reproduce el formulario real de chat.html, simula texto escrito
+// por el usuario, invoca la funcion submitChat() real (sin reescribirla a mano) y verifica el
+// contenido efectivo del FormData que se enviaria a fetch().
 //
 // Uso: node tests/js/test_submit_chat_formdata.mjs
 
@@ -15,15 +16,9 @@ import { JSDOM } from "jsdom";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..", "..");
-const chatHtmlPath = path.join(repoRoot, "app", "templates", "chat.html");
+const chatJsPath = path.join(repoRoot, "app", "static", "js", "chat.js");
 
-const chatHtml = readFileSync(chatHtmlPath, "utf8");
-const scriptMatch = chatHtml.match(/<script>([\s\S]*)<\/script>/);
-if (!scriptMatch) {
-  console.error("FAIL: no se pudo extraer el bloque <script> de chat.html");
-  process.exit(1);
-}
-const inlineScript = scriptMatch[1];
+const inlineScript = readFileSync(chatJsPath, "utf8");
 
 // DOM minimo que reproduce la estructura real del formulario de chat.html
 // (ids/names identicos a los del archivo real).

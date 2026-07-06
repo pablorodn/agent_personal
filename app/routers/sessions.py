@@ -37,11 +37,14 @@ async def get_sessions(
 @router.post("", response_class=HTMLResponse)
 async def post_session(
     request: Request,
+    current_session_id: str = Form(default=""),
     db: AsyncClient = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
 ):
     session = await create_session(db, user_id, channel="web")
-    sessions = await list_sessions(db, user_id=user_id, channel="web")
+    previous_session = None
+    if current_session_id and current_session_id != session.id:
+        previous_session = await get_session_by_id(db, current_session_id)
     profile = await get_profile(db, user_id)
     return templates.TemplateResponse(
         request,
@@ -50,9 +53,12 @@ async def post_session(
             "request": request,
             "messages": [],
             "agent_name": profile.agent_name if profile and profile.agent_name else "Agente",
-            "sessions": sessions,
             "current_session_id": session.id,
             "has_pending_confirmation": False,
+            "previous_session": previous_session,
+            "active_session": session,
+            "active_session_oob": "afterbegin:#session-list",
+            "clear_empty_state": True,
         },
     )
 

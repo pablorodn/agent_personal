@@ -156,6 +156,36 @@ def test_chat_rejects_disallowed_mime_type(monkeypatch, patch_auth_middleware, a
     app.dependency_overrides.clear()
 
 
+def test_chat_error_fragment_escapes_malicious_attachment_filename(
+    monkeypatch, patch_auth_middleware, auth_cookie
+):
+    """Regresion de seguridad (Fase 4, hallazgo incidental): _error_fragment en
+    app/routers/chat.py interpolaba el mensaje de error sin escapar HTML. Como
+    ese mensaje incluye file.filename tal cual lo eligio el usuario (ver
+    AttachmentValidationError en app/services/attachments.py), subir un
+    archivo con un nombre malicioso por la ruta sin streaming (POST /api/chat)
+    reflejaba ese HTML/JS crudo en la respuesta: XSS reflejada real.
+    """
+    captured: dict = {}
+    _install_common_fakes(monkeypatch, captured)
+
+    malicious_filename = "<script>alert(1)</script>.zip"
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/chat",
+        cookies=auth_cookie,
+        data={"message": "hola", "session_id": "session-1"},
+        files=[("attachments", (malicious_filename, b"data", "application/zip"))],
+    )
+
+    assert response.status_code == 400
+    assert "<script>alert(1)</script>" not in response.text
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in response.text
+    assert "messages" not in captured
+    app.dependency_overrides.clear()
+
+
 def test_chat_rejects_more_than_three_attachments(monkeypatch, patch_auth_middleware, auth_cookie):
     captured: dict = {}
     _install_common_fakes(monkeypatch, captured)

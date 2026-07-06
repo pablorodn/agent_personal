@@ -147,10 +147,12 @@ No se planifica rediseño de flujo; los únicos ajustes vigentes son:
 - `partials/session_item.html`
 - `partials/settings_save_status.html`
 
-Partials adicionales usados por estas capacidades (nombres reales u equivalentes):
+Estado real: no existen archivos separados `partials/chat_attachment_errors.html` ni
+`partials/session_item_menu.html`. El error de adjuntos vive inline en
+`partials/chat_composer.html` (`#attachment-error`) y el menú de 3 puntos
+Archivar/Eliminar vive inline en `partials/session_item.html`
+(`#session-menu-{{ session.id }}`).
 
-- `partials/chat_attachment_errors.html` (o equivalente)
-- `partials/session_item_menu.html` (o equivalente para menú de 3 puntos Archivar/Eliminar)
 - `partials/message.html` debe soportar render de indicador `attachment_note` en mensajes de usuario con adjuntos.
 
 ## 11) HTMX para adjuntos y selector de modelo

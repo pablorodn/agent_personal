@@ -7,6 +7,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from markupsafe import escape
 from supabase import AsyncClient
 
 from app.agent.graph import AgentInput, AgentOutput, run_agent
@@ -77,11 +78,26 @@ def _sse(event: str, data: dict[str, object]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=True)}\n\n"
 
 
+# Debe reflejar el mismo texto/clases que ERROR_BUBBLE_CLASSES y
+# DEFAULT_ASSISTANT_ERROR_MESSAGE en app/static/js/chat.js (appendAssistantError,
+# usado por la ruta con streaming). Si cambia uno, cambiar el otro.
+ERROR_BUBBLE_CLASSES = (
+    "max-w-[80%] rounded-lg bg-amber-100 px-4 py-2.5 text-sm text-amber-900 "
+    "dark:bg-amber-900/40 dark:text-amber-100"
+)
+
+
 def _error_fragment(message: str) -> str:
+    # message puede contener datos no confiables (ej. nombre de archivo
+    # adjunto elegido por el usuario, ver AttachmentValidationError en
+    # app/services/attachments.py) que llegan sin sanitizar hasta aca.
+    # Escapar es obligatorio: esta funcion arma HTML a mano (no via Jinja2,
+    # que autoescapa por defecto) y el resultado se devuelve tal cual como
+    # Response(media_type="text/html").
     return (
         '<div class="flex justify-start">'
-        '<div class="max-w-[80%] rounded-lg bg-amber-100 px-4 py-2.5 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">'
-        f"{message}"
+        f'<div class="{ERROR_BUBBLE_CLASSES}">'
+        f"{escape(message)}"
         "</div></div>"
     )
 

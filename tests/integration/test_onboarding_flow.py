@@ -34,8 +34,15 @@ def test_onboarding_step_tools_persists_in_session(
     assert review.status_code == 200
     assert "read_file" in review.text
     assert "write_file" in review.text
-    assert 'hx-target="body"' in review.text
+    # Fase 4 (Bloque F): la navegacion entre pasos ya no reemplaza <body>
+    # entero (perdiendo scroll/foco); ahora hace swap incremental solo del
+    # contenedor id="onboarding-wizard" (nav de pasos + card + botones),
+    # extraido de la respuesta completa via hx-select.
+    assert 'id="onboarding-wizard"' in review.text
+    assert 'hx-target="#onboarding-wizard"' in review.text
+    assert 'hx-select="#onboarding-wizard"' in review.text
     assert 'hx-swap="outerHTML"' in review.text
+    assert 'hx-target="body"' not in review.text
     app.dependency_overrides.clear()
 
 

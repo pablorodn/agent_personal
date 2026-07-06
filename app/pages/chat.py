@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from supabase import AsyncClient
@@ -57,18 +57,23 @@ async def chat_session(
     request: Request,
     db: AsyncClient = Depends(get_db),
     user_id: str = Depends(get_current_user_id),
+    current_session_id: str = Query(default=""),
 ):
     session = await get_session_by_id(db, session_id)
+    previous_session = None
     if not session or session.user_id != user_id:
         messages = []
-        current_session_id = None
+        new_current_session_id = None
         has_pending_confirmation = False
+        active_session = None
     else:
         await touch_session(db, session_id)
         messages = await get_session_messages(db, session_id)
-        current_session_id = session_id
+        new_current_session_id = session_id
         has_pending_confirmation = await has_pending_confirmation_for_session(db, session_id)
-    sessions = await list_sessions(db, user_id=user_id, channel="web")
+        active_session = session
+        if current_session_id and current_session_id != session_id:
+            previous_session = await get_session_by_id(db, current_session_id)
     profile = await get_profile(db, user_id)
     return templates.TemplateResponse(
         request,
@@ -77,8 +82,10 @@ async def chat_session(
             "request": request,
             "messages": messages,
             "agent_name": profile.agent_name if profile and profile.agent_name else "Agente",
-            "sessions": sessions,
-            "current_session_id": current_session_id,
+            "current_session_id": new_current_session_id,
             "has_pending_confirmation": has_pending_confirmation,
+            "previous_session": previous_session,
+            "active_session": active_session,
+            "active_session_oob": True,
         },
     )
