@@ -16,8 +16,6 @@ class Settings(BaseSettings):
     openrouter_api_key: str = Field(alias="OPENROUTER_API_KEY")
     secret_key: str = Field(alias="SECRET_KEY")
 
-    oauth_encryption_key: str | None = Field(default=None, alias="OAUTH_ENCRYPTION_KEY")
-
     file_tools_enabled: str | None = Field(default=None, alias="FILE_TOOLS_ENABLED")
     file_tools_root: str | None = Field(default=None, alias="FILE_TOOLS_ROOT")
 

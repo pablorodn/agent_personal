@@ -13,7 +13,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
-    { name = "cryptography" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "itsdangerous" },
@@ -46,7 +45,6 @@ dev = [
 requires-dist = [
     { name = "anyio", marker = "extra == 'dev'", specifier = ">=4.4" },
     { name = "asyncpg", specifier = ">=0.29" },
-    { name = "cryptography", specifier = ">=42" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "itsdangerous", specifier = ">=2.2" },

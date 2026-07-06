@@ -8,7 +8,6 @@ os.environ.setdefault("SUPABASE_SERVICE_ROLE_KEY", "service")
 os.environ.setdefault("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/postgres")
 os.environ.setdefault("OPENROUTER_API_KEY", "test")
 os.environ.setdefault("SECRET_KEY", "test-secret")
-os.environ.setdefault("OAUTH_ENCRYPTION_KEY", "0" * 64)
 
 
 @pytest.fixture
